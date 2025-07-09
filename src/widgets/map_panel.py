@@ -160,8 +160,8 @@ class MapPanel(QOpenGLWidget):
         # construct transform matrices and pass them to the shader
         proj_mat = self._create_projection_matrix()
         view_mat = self._create_view_matrix()
-        glUniformMatrix4fv(glGetUniformLocation(self.shader_program, "projection"), 1, GL_FALSE, proj_mat)
-        glUniformMatrix4fv(glGetUniformLocation(self.shader_program, "view"), 1, GL_FALSE, view_mat)
+        glUniformMatrix4fv(glGetUniformLocation(self.shader_program, "projection"), 1, GL_TRUE, proj_mat)
+        glUniformMatrix4fv(glGetUniformLocation(self.shader_program, "view"), 1, GL_TRUE, view_mat)
         
         # determine visible chunks
         visible_chunks = self._get_visible_chunks()
@@ -378,7 +378,7 @@ class MapPanel(QOpenGLWidget):
         ndc_x, ndc_y = ((screen_pos[0] / w) * 2 - 1, 1 - (screen_pos[1] / h) * 2)
         proj, view = self._create_projection_matrix(), self._create_view_matrix()
         inv_proj, inv_view = np.linalg.inv(proj), np.linalg.inv(view)
-        world_pos = inv_view @ inv_proj @ np.array([ndc_x, ndc_y, 0, 1])
+        world_pos = inv_view @ inv_proj @ np.array([ndc_x, ndc_y, 0, 1]).T
         return QPointF(world_pos[0], world_pos[1])
     
     # mouse events
