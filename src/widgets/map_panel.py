@@ -9,10 +9,15 @@ from OpenGL.GLU import *
 from utils.helpers import load_program
 from loguru import logger
 
+# TODO: refactor those constants to use configuration files
+
 CHUNK_SIZE = 16
 DATA_DIMENSIONS = 4 # 4 channels for a chunk: (r, g, b, a)
 HEX_RADIUS = 1
 HEX_HEIGHT = 0.5
+OUTLINE_COLOR = [0.6, 0.6, 0.6, 0.4]
+DEFAULT_CELL_COLOR = [0.5, 0.5, 0.5, 1]
+OUTLINE_WIDTH = 2.0
 
 class HexChunkManager:
     def __init__(self):
@@ -29,7 +34,7 @@ class HexChunkManager:
             _type_: the chunk data
         """
         if chunk_coord not in self.chunks:
-            self.chunks[chunk_coord] = np.full((CHUNK_SIZE, CHUNK_SIZE, DATA_DIMENSIONS), [0.5, 0.5, 0.5, 1], dtype=np.float32)
+            self.chunks[chunk_coord] = np.full((CHUNK_SIZE, CHUNK_SIZE, DATA_DIMENSIONS), DEFAULT_CELL_COLOR, dtype=np.float32)
         return self.chunks[chunk_coord]
     
     
@@ -80,7 +85,8 @@ class MapPanel(QOpenGLWidget):
         # Rendering states
         self.shader_program = None
         self.hex_vbo = None                 # the geometry data for a single hexagon cell (using Instanced Rendering here)
-        self.chunk_buffers : dict = {}             # chunk_coord -> instance_vbo_id, vao_id; used to store instance data for each chunk
+        self.outline_vbo = None             # geometry data for outline
+        self.chunk_buffers : dict[tuple[int, int], dict[str, int]] = {}             # chunk_coord -> instance_vbo_id, vao_id; used to store instance data for each chunk
         
         # Camera states
         self.camera_pos = QPointF(0.0, 0.0) # position of the camera
@@ -119,23 +125,34 @@ class MapPanel(QOpenGLWidget):
         """Creates a hexagon geometry (vertices) using the triangle fan method
         to be shared around all instances.
         """
-        unit_hex_indices = [(0.0, 0.0)] # center vertex
+        filled_vertices = [(0.0, 0.0)]   # center vertex
+                                        # this is for the filled hexagon coloring
+        outline_vertices = []
         
         for i in range(6):
             angle = i * 60 * np.pi / 180
             x = HEX_RADIUS * np.cos(angle)
             y = HEX_RADIUS * np.sin(angle)
-            unit_hex_indices.append((x, y))
+            filled_vertices.append((x, y))
+            outline_vertices.append((x, y))
+            
             
         # To close the loop for triangle fan
-        unit_hex_indices.append(unit_hex_indices[1])
+        filled_vertices.append(filled_vertices[1])
         
-        geometry_data = np.array(unit_hex_indices, dtype=np.float32)
+        geometry_data = np.array(filled_vertices, dtype=np.float32)
+        outline_data = np.array(outline_vertices, dtype=np.float32)
         
-        # Pass the created geometry to the GPU
+        # create VBO for the filled hexagon geometry
         self.hex_vbo = glGenBuffers(1)
         glBindBuffer(GL_ARRAY_BUFFER, self.hex_vbo)
         glBufferData(GL_ARRAY_BUFFER, geometry_data.nbytes, geometry_data, GL_STATIC_DRAW)
+        
+        # create VBO for outline geometry
+        self.outline_vbo = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, self.outline_vbo)
+        glBufferData(GL_ARRAY_BUFFER, outline_data.nbytes, outline_data, GL_STATIC_DRAW)
+        
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         
         
@@ -163,6 +180,9 @@ class MapPanel(QOpenGLWidget):
         glUniformMatrix4fv(glGetUniformLocation(self.shader_program, "projection"), 1, GL_TRUE, proj_mat)
         glUniformMatrix4fv(glGetUniformLocation(self.shader_program, "view"), 1, GL_TRUE, view_mat)
         
+        color_loc = glGetUniformLocation(self.shader_program, "color")
+        mode_loc = glGetUniformLocation(self.shader_program, "drawMode")
+        
         # determine visible chunks
         visible_chunks = self._get_visible_chunks()
         
@@ -172,9 +192,19 @@ class MapPanel(QOpenGLWidget):
                 self._update_chunk_instance_buffer(chunk_coord)
             
             # logger.debug(f"Drawing chunk {chunk_coord}")
-            vao = self.chunk_buffers[chunk_coord][1]
-            glBindVertexArray(vao)
+            glUniform1i(mode_loc, 0)
+            glUniform4f(color_loc, *DEFAULT_CELL_COLOR)
+            filled_vao = self.chunk_buffers[chunk_coord]["filled_vao"]
+            glBindVertexArray(filled_vao)
             glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 8, CHUNK_SIZE * CHUNK_SIZE)
+            
+            glUniform1i(mode_loc, 1)
+            glUniform4f(color_loc, *OUTLINE_COLOR)
+            glLineWidth(OUTLINE_WIDTH)
+            outline_vao = self.chunk_buffers[chunk_coord]["outline_vao"]
+            glBindVertexArray(outline_vao)
+            glDrawArraysInstanced(GL_LINE_LOOP, 0, 6, CHUNK_SIZE * CHUNK_SIZE)
+        
             glBindVertexArray(0)
         
     def _update_chunk_instance_buffer(self, chunk_coord: tuple[int, int]):
@@ -182,16 +212,19 @@ class MapPanel(QOpenGLWidget):
         logger.debug(f"Updating chunk instance buffer for chunk {chunk_coord}")
         
         if chunk_coord in self.chunk_buffers:
-            instance_vbo_id, vao_id = self.chunk_buffers[chunk_coord]
+            buf = self.chunk_buffers[chunk_coord]
+            instance_vbo_id, filled_vao_id, outline_vao_id = buf["instance_vbo"], buf["filled_vao"], buf["outline_vao"]
             glDeleteBuffers(1, [instance_vbo_id])
-            glDeleteVertexArrays(1, [vao_id])
+            glDeleteVertexArrays(1, [filled_vao_id])
+            glDeleteVertexArrays(1, [outline_vao_id])
             
         chunk_data = self.data_manager.get_chunk_data(chunk_coord)
         # FIX: Ensure the numpy array has the correct float32 dtype for OpenGL
         instance_data = np.array(self._generate_chunk_instance_data(chunk_coord, chunk_data), dtype=np.float32)
         
-        vao = glGenVertexArrays(1)
-        glBindVertexArray(vao)
+        
+        filled_vao = glGenVertexArrays(1)
+        glBindVertexArray(filled_vao)
         
         glBindBuffer(GL_ARRAY_BUFFER, self.hex_vbo)
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), ctypes.c_void_p(0))
@@ -207,16 +240,33 @@ class MapPanel(QOpenGLWidget):
         glEnableVertexAttribArray(1)
         glVertexAttribDivisor(1, 1)
         
-        # Color attribute
+        # Color attribute for the filled hexagon
         glVertexAttribPointer(2, DATA_DIMENSIONS, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(2 * sizeof(GLfloat)))
         glEnableVertexAttribArray(2)
         glVertexAttribDivisor(2, 1)
+        
+        # Points for the outline to draw (x1, y1), (x2, y2), ...
+        outline_vao = glGenVertexArrays(1)
+        glBindVertexArray(outline_vao)
+        glBindBuffer(GL_ARRAY_BUFFER, self.outline_vbo)
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+        
+        # We only need the offset passed in the first step
+        glBindBuffer(GL_ARRAY_BUFFER, instance_vbo)
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(1)
+        glVertexAttribDivisor(1, 1)
         
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
         
         logger.debug(f"Finished instance buffer update for chunk {chunk_coord}")
-        self.chunk_buffers[chunk_coord] = (instance_vbo, vao)
+        self.chunk_buffers[chunk_coord] = {
+            "filled_vao": filled_vao,
+            "instance_vbo": instance_vbo,
+            "outline_vao": outline_vao
+        }
 
     def _generate_chunk_instance_data(self, chunk_coord: tuple[int, int], chunk_data: np.ndarray):
         """Generate data for a given chunk instance."""
@@ -405,7 +455,6 @@ class MapPanel(QOpenGLWidget):
             self.camera_pos.setX(self.camera_pos.x() - delta_screen_x * world_dx_per_pixel)
             self.camera_pos.setY(self.camera_pos.y() + delta_screen_y * world_dy_per_pixel) # 注意这里是 +
 
-            logger.debug(f"Camera position: {self.camera_pos}")
             self.update()
     
         # Paint cells with the right mouse button
