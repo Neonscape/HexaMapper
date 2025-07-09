@@ -1,0 +1,20 @@
+background:
+  mode: gradient # gradient / solid
+  solid_color: "#333333FF"
+  grad_color_0: "#495766FF"
+  grad_color_1: "#60656bFF"
+
+hex_map_engine:
+  chunk_size: 16 # a chunk has CHUNK_SIZE * CHUNK_SIZE units
+  data_dimensions: 4 # data size for each hexagon unit (currently only [r, g, b, a])
+  hex_radius: 1.0 # the radius of each hexagon unit
+  hex_height: 0.5 # unused; reserved for future 3d scene
+
+hex_map_custom:
+  outline_color: "#9999996A"
+  default_cell_color: "#888888FF"
+  outline_width: 2.0
+
+hex_map_view:
+  min_zoom: 0.01
+  max_zoom: 5.0

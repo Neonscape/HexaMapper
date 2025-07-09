@@ -1,4 +1,7 @@
 #version 330 core
+
+// vertex shader for 2D hexagon map view
+
 layout (location = 0) in vec2 aPos; 
 layout (location = 1) in vec2 aInstancePos;
 layout (location = 2) in vec4 aInstanceColor;

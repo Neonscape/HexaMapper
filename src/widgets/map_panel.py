@@ -1,4 +1,4 @@
-from ctypes import Union
+from typing import Literal
 from math import sqrt
 from PyQt6.QtGui import QMouseEvent, QWheelEvent
 from PyQt6.QtCore import QPointF, Qt
@@ -7,9 +7,15 @@ import numpy as np
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from utils.helpers import load_program
+from enum import Enum
+from modules.chunk_engine import ChunkEngine
 from loguru import logger
 
 # TODO: refactor those constants to use configuration files
+
+class DrawMode(Enum):
+    DRAW_FILLED = 0
+    DRAW_OUTLINE = 1
 
 CHUNK_SIZE = 16
 DATA_DIMENSIONS = 4 # 4 channels for a chunk: (r, g, b, a)
@@ -18,72 +24,29 @@ HEX_HEIGHT = 0.5
 OUTLINE_COLOR = [0.6, 0.6, 0.6, 0.4]
 DEFAULT_CELL_COLOR = [0.5, 0.5, 0.5, 1]
 OUTLINE_WIDTH = 2.0
+MIN_ZOOM = 0.01
+MAX_ZOOM = 5.0
 
-class HexChunkManager:
-    def __init__(self):
-        self.chunks: dict[tuple[int, int], np.ndarray] = {}
-        self.dirty_chunks : set[tuple[int, int]] = set()
+# Define colors for the gradient background
+TOP_BG_COLOR = [0.2, 0.2, 0.3, 1.0] # Dark gray-blue
+BOTTOM_BG_COLOR = [0.6, 0.6, 0.6, 1.0] # Gray
+
+
+
         
-    def _get_or_create_chunk(self, chunk_coord: tuple[int, int]) -> np.ndarray:
-        """Get a chunk's information (and creates it when non-exist).
-
-        Args:
-            chunk_coord (tuple[int, int]): the coordinate of the chunk
-
-        Returns:
-            _type_: the chunk data
-        """
-        if chunk_coord not in self.chunks:
-            self.chunks[chunk_coord] = np.full((CHUNK_SIZE, CHUNK_SIZE, DATA_DIMENSIONS), DEFAULT_CELL_COLOR, dtype=np.float32)
-        return self.chunks[chunk_coord]
-    
-    
-    def set_cell_data(self, global_coords: tuple[int, int], data: np.ndarray) -> None:
-        """Change a cell's data.
-
-        Args:
-            global_coords (tuple[int, int]): the global coords of the cell
-            data (np.ndarray): the data to write
-        """
-        logger.debug(f"Setting cell data at {global_coords} to {data}")
-        chunk_x, chunk_y, local_x, local_y = MapPanel.global_coord_to_chunk_coord(global_coords)
-        chunk_data = self._get_or_create_chunk((chunk_x, chunk_y))
-        chunk_data[local_x, local_y] = data
-        self.dirty_chunks.add((chunk_x, chunk_y))
-        
-        
-    def get_chunk_data(self, chunk_coord: tuple[int, int]) -> np.ndarray:
-        """Get a chunk's data.
-
-        Args:
-            chunk_coord (tuple[int, int]): the chunk's coordinate
-
-        Returns:
-            np.ndarray: the chunk's data
-        """
-        
-        return self._get_or_create_chunk(chunk_coord=chunk_coord)
-    
-    def get_and_clear_dirty_chunks(self) -> list[tuple[int, int]]:
-        """Get the dirty chunks and clear the dirty list.
-
-        Returns:
-            list[tuple[int, int]]: the dirty chunks
-        """
-        
-        dirty = list(self.dirty_chunks)
-        self.dirty_chunks.clear()
-        return dirty
-        
+# TODO: Dissect map draw / management logic from the display panel?
 class MapPanel(QOpenGLWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.initUI()
-        self.mode : Union["2D", "3D"] = "2D"
-        self.data_manager : HexChunkManager = HexChunkManager()
+        self.mode : Literal['3D', '2D'] = "2D" # reserved for later 3D development
+        self.data_manager : ChunkEngine = ChunkEngine()
         
-        # Rendering states
-        self.shader_program = None
+        # Rendering properties
+        self.hex_shader_program = None
+        self.background_shader_program = None
+        self.background_vao = None
+        self.background_vbo = None
         self.hex_vbo = None                 # the geometry data for a single hexagon cell (using Instanced Rendering here)
         self.outline_vbo = None             # geometry data for outline
         self.chunk_buffers : dict[tuple[int, int], dict[str, int]] = {}             # chunk_coord -> instance_vbo_id, vao_id; used to store instance data for each chunk
@@ -99,9 +62,12 @@ class MapPanel(QOpenGLWidget):
         self.background_color = [0.2, 0.2, 0.2, 1.0] # RGBA
         
         # OpenGL Attributes
-        # TODO: refactor them to use configuration file
-        self.vertex_shader_path = "./src/shaders/vertex_shader.glsl"
-        self.fragment_shader_path = "./src/shaders/fragment_shader.glsl"
+        # TODO: refactor these to use configuration file...?
+        # maybe we can construct a shader manager...?
+        self.hex_vertex_shader_path = "./src/shaders/hex/vsh.glsl"
+        self.hex_fragment_shader_path = "./src/shaders/hex/fsh.glsl"
+        self.background_vertex_shader_path = "./src/shaders/background/vsh.glsl"
+        self.background_fragment_shader_path = "./src/shaders/background/fsh.glsl"
         
     
     
@@ -113,13 +79,20 @@ class MapPanel(QOpenGLWidget):
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
-        self.shader_program = load_program(self.vertex_shader_path, self.fragment_shader_path)
+        # maybe we can have a more robust shader (file / program) management system?
+        self.hex_shader_program = load_program(self.hex_vertex_shader_path, self.hex_fragment_shader_path)
+        self.background_shader_program = load_program(self.background_vertex_shader_path, self.background_fragment_shader_path)
         
-        if self.shader_program is None:
-            logger.error("Failed to initialize application. exitting...")
+        if self.hex_shader_program is None:
+            logger.error("Failed to compile hex shader. exitting...")
+            exit(1)
+        
+        if self.background_shader_program is None:
+            logger.error("Failed to compile background shader. exitting...")
             exit(1)
             
         self._create_shared_hex_geometry()
+        self._create_background_quad_geometry()
             
     def _create_shared_hex_geometry(self) -> None:
         """Creates a hexagon geometry (vertices) using the triangle fan method
@@ -154,8 +127,45 @@ class MapPanel(QOpenGLWidget):
         glBufferData(GL_ARRAY_BUFFER, outline_data.nbytes, outline_data, GL_STATIC_DRAW)
         
         glBindBuffer(GL_ARRAY_BUFFER, 0)
+    
+    def _create_background_quad_geometry(self) -> None:
+        """Creates a full-screen quad for the background."""
+        # Vertices for a quad covering the entire viewport, in pixel coordinates
+        # These coordinates will be transformed to clip space in the vertex shader
+        background_vertices = np.array([
+            0.0, 0.0,  # Bottom-left
+            self.width(), 0.0, # Bottom-right
+            self.width(), self.height(), # Top-right
+            0.0, self.height() # Top-left
+        ], dtype=np.float32)
+
+        self.background_vao = glGenVertexArrays(1)
+        self.background_vbo = glGenBuffers(1)
+
+        glBindVertexArray(self.background_vao)
+        glBindBuffer(GL_ARRAY_BUFFER, self.background_vbo)
+        glBufferData(GL_ARRAY_BUFFER, background_vertices.nbytes, background_vertices, GL_DYNAMIC_DRAW) # DYNAMIC_DRAW because size might change on resize
+
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
         
+    def _update_background_geometry(self, w:int, h: int) -> None:
+        """Updates the background quad vertices based on new window dimensions."""
+        background_vertices = np.array([
+            0.0, 0.0,
+            w, 0.0,
+            w, h,
+            0.0, h
+        ], dtype=np.float32)
         
+        glBindBuffer(GL_ARRAY_BUFFER, self.background_vbo)
+        glBufferSubData(GL_ARRAY_BUFFER, 0, background_vertices.nbytes, background_vertices)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        
+    # TODO: implement application style management & style file load
 
     def initUI(self):
         self.setStyleSheet("background-color: #333333;")
@@ -163,25 +173,86 @@ class MapPanel(QOpenGLWidget):
 
     def resizeGL(self, w, h):
         glViewport(0, 0, w, h)
+        if self.background_vbo is not None:
+            self._update_background_geometry(w, h)
+            
+    def _draw_gradient_background(self):
+        """
+        Renders a gradient background using a full-screen quad and a dedicated shader.
+        This should be called FIRST in paintGL.
+        """
+        glDisable(GL_DEPTH_TEST) # Ensure background is always behind everything
+        
+        glUseProgram(self.background_shader_program)
+        
+        # Pass colors and viewport height to the background shader
+        glUniform4f(glGetUniformLocation(self.background_shader_program, "topColor"), *TOP_BG_COLOR)
+        glUniform4f(glGetUniformLocation(self.background_shader_program, "bottomColor"), *BOTTOM_BG_COLOR)
+        glUniform1f(glGetUniformLocation(self.background_shader_program, "viewportHeight"), float(self.height()))
+        
+        glBindVertexArray(self.background_vao)
+        glDrawArrays(GL_QUADS, 0, 4) # Draw the quad
+        glBindVertexArray(0)
+        
+        glUseProgram(0) # Deactivate background shader
+        glEnable(GL_DEPTH_TEST) # Re-enable depth test for your main scene if needed
+
+    def _draw_hex_chunk_filled(self, chunk_buffer: dict[str, int]):
+        
+        glUseProgram(self.hex_shader_program)
+        
+        proj_mat = self._create_projection_matrix()
+        view_mat = self._create_view_matrix()
+        glUniformMatrix4fv(glGetUniformLocation(self.hex_shader_program, "projection"), 1, GL_TRUE, proj_mat)
+        glUniformMatrix4fv(glGetUniformLocation(self.hex_shader_program, "view"), 1, GL_TRUE, view_mat)
+        
+        color_loc = glGetUniformLocation(self.hex_shader_program, "color")
+        mode_loc = glGetUniformLocation(self.hex_shader_program, "drawMode")
+        
+        glUniform1i(mode_loc, DrawMode.DRAW_FILLED.value)
+        glUniform4f(color_loc, *DEFAULT_CELL_COLOR)
+        glBindVertexArray(chunk_buffer["filled_vao"])
+        glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 8, CHUNK_SIZE * CHUNK_SIZE)
+        
+        glBindVertexArray(0)
+        glUseProgram(0)
+    
+    def _draw_hex_chunk_outline(self, chunk_buffer: dict[str, int]):
+
+        glUseProgram(self.hex_shader_program)
+
+        proj_mat = self._create_projection_matrix()
+        view_mat = self._create_view_matrix()
+        glUniformMatrix4fv(glGetUniformLocation(self.hex_shader_program, "projection"), 1, GL_TRUE, proj_mat)
+        glUniformMatrix4fv(glGetUniformLocation(self.hex_shader_program, "view"), 1, GL_TRUE, view_mat)
+
+        color_loc = glGetUniformLocation(self.hex_shader_program, "color")
+        mode_loc = glGetUniformLocation(self.hex_shader_program, "drawMode")
+
+        glUniform1i(mode_loc, DrawMode.DRAW_OUTLINE.value)
+        glUniform4f(color_loc, *OUTLINE_COLOR)
+        glLineWidth(OUTLINE_WIDTH)
+        glBindVertexArray(chunk_buffer["outline_vao"])
+        glDrawArraysInstanced(GL_LINE_LOOP, 0, 6, CHUNK_SIZE * CHUNK_SIZE)
+
+        glBindVertexArray(0)
+        glUseProgram(0)
+        
+        
+        
 
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT)
-        glUseProgram(self.shader_program)
+        
+        self._draw_gradient_background()
+        
+        glUseProgram(self.hex_shader_program)
         
         dirty_chunks = self.data_manager.get_and_clear_dirty_chunks()
         
         for chunk_coord in dirty_chunks:
             logger.debug("Updating chunk instance buffer for dirty chunks...")
             self._update_chunk_instance_buffer(chunk_coord)
-            
-        # construct transform matrices and pass them to the shader
-        proj_mat = self._create_projection_matrix()
-        view_mat = self._create_view_matrix()
-        glUniformMatrix4fv(glGetUniformLocation(self.shader_program, "projection"), 1, GL_TRUE, proj_mat)
-        glUniformMatrix4fv(glGetUniformLocation(self.shader_program, "view"), 1, GL_TRUE, view_mat)
-        
-        color_loc = glGetUniformLocation(self.shader_program, "color")
-        mode_loc = glGetUniformLocation(self.shader_program, "drawMode")
         
         # determine visible chunks
         visible_chunks = self._get_visible_chunks()
@@ -191,21 +262,8 @@ class MapPanel(QOpenGLWidget):
                 logger.debug(f"Visible chunk {chunk_coord} not in chunk buffer, constructing buffer for it...")
                 self._update_chunk_instance_buffer(chunk_coord)
             
-            # logger.debug(f"Drawing chunk {chunk_coord}")
-            glUniform1i(mode_loc, 0)
-            glUniform4f(color_loc, *DEFAULT_CELL_COLOR)
-            filled_vao = self.chunk_buffers[chunk_coord]["filled_vao"]
-            glBindVertexArray(filled_vao)
-            glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 8, CHUNK_SIZE * CHUNK_SIZE)
-            
-            glUniform1i(mode_loc, 1)
-            glUniform4f(color_loc, *OUTLINE_COLOR)
-            glLineWidth(OUTLINE_WIDTH)
-            outline_vao = self.chunk_buffers[chunk_coord]["outline_vao"]
-            glBindVertexArray(outline_vao)
-            glDrawArraysInstanced(GL_LINE_LOOP, 0, 6, CHUNK_SIZE * CHUNK_SIZE)
-        
-            glBindVertexArray(0)
+            self._draw_hex_chunk_filled(self.chunk_buffers[chunk_coord])
+            self._draw_hex_chunk_outline(self.chunk_buffers[chunk_coord])
         
     def _update_chunk_instance_buffer(self, chunk_coord: tuple[int, int]):
         """Generates instance data for a chunk (pos, color) and upload it to GPU."""
@@ -420,8 +478,48 @@ class MapPanel(QOpenGLWidget):
         ndc_x, ndc_y = ((screen_pos[0] / w) * 2 - 1, 1 - (screen_pos[1] / h) * 2)
         proj, view = self._create_projection_matrix(), self._create_view_matrix()
         inv_proj, inv_view = np.linalg.inv(proj), np.linalg.inv(view)
-        world_pos = inv_view @ inv_proj @ np.array([ndc_x, ndc_y, 0, 1]).T
+        world_pos = inv_view @ inv_proj @ np.array([ndc_x, ndc_y, 0, 1])
         return QPointF(world_pos[0], world_pos[1])
+    
+    def moveView(self, last_view_pos: QPointF, current_view_pos: QPointF):
+        """moves the camera based on two view locations.
+
+        Args:
+            last_view_pos (QPointF): last position the cursor is on the screen
+            current_view_pos (QPointF): current position the cursor is on the screen
+        """
+        
+        delta_x = current_view_pos.x() - last_view_pos.x()
+        delta_y = current_view_pos.y() - last_view_pos.y()
+        
+        w, h = self.width(), self.height()
+        
+        aspect = w / h if h > 0 else 1
+        
+        world_view_width = 2 * aspect / self.camera_zoom
+        world_view_height = 2 / self.camera_zoom
+        world_dx_per_pixel = world_view_width / w
+        world_dy_per_pixel = world_view_height / h
+        self.camera_pos.setX(self.camera_pos.x() - delta_x * world_dx_per_pixel)
+        self.camera_pos.setY(self.camera_pos.y() + delta_y * world_dy_per_pixel)
+        self.update()
+        
+    def zoom(self, isZoomingUp: bool):
+        """Zooms in or out based on the zoom factor.
+
+        Args:
+            isZoomingUp (bool): True if zooming in, False if zooming out
+        """
+        if isZoomingUp:
+            self.camera_zoom *= 1.1
+        else:
+            self.camera_zoom /= 1.1
+            
+        self.camera_zoom = max(MIN_ZOOM, min(self.camera_zoom, MAX_ZOOM))
+        self.update()
+        
+        
+
     
     # mouse events
     
