@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyi
+*.pyw
+*.pyz
+*.egg-info
+*.egg
+*.manifest
+*.spec
+*.dist-info
+.vscode/
