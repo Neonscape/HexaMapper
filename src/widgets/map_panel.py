@@ -300,22 +300,15 @@ class MapPanel(QOpenGLWidget):
         
     @staticmethod
     def global_pos_to_global_coord(global_pos: QPointF) -> tuple[int, int]:
-        """Finds the global coord of the cell at the given world position.
-
-        Args:
-            global_pos (QPointF): the world position
-
-        Returns:
-            tuple[int, int]: the global coord of the cell
-        """
-        # odd-q vertical layout
-        row_approx = global_pos.y() / (1.5 * HEX_RADIUS)
-        row = round(row_approx)
+        """Finds the global coord of the cell at the given world position."""
+        # CORRECTED: Use proper horizontal scaling factor (1.5 * HEX_RADIUS)
+        col_approx = global_pos.x() / (1.5 * HEX_RADIUS)
         
-        col_approx = (global_pos.x() / (sqrt(3) * HEX_RADIUS)) - (0.5 if row % 2 == 1 else 0)
+        # CORRECTED: Use proper vertical scaling factor (sqrt(3) * HEX_RADIUS)
+        row_approx = global_pos.y() / (sqrt(3) * HEX_RADIUS)
+        
         col = round(col_approx)
-        
-        # To handle the rounding errors, we can convert back to world coordinates and check the distance
+        row = round(row_approx)
         
         # Find the coordinates of the three closest hex centers
         candidates = []
@@ -329,7 +322,6 @@ class MapPanel(QOpenGLWidget):
         
         # Find the one with the minimum distance
         best_coord, _ = min(candidates, key=lambda item: item[1])
-        
         return best_coord
         
         
