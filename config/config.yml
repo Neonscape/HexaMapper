@@ -11,10 +11,18 @@ hex_map_engine:
   hex_height: 0.5 # unused; reserved for future 3d scene
 
 hex_map_custom:
-  outline_color: "#9999996A"
+  outline_color: "#FFFFFF6A"
   default_cell_color: "#888888FF"
   outline_width: 2.0
 
 hex_map_view:
   min_zoom: 0.01
   max_zoom: 5.0
+
+hex_map_shaders:
+  unit:
+    vertex: "src/shaders/hex/vsh.glsl"
+    fragment: "src/shaders/hex/fsh.glsl"
+  background:
+    vertex: "src/shaders/background/vsh.glsl"
+    fragment: "src/shaders/background/fsh.glsl"

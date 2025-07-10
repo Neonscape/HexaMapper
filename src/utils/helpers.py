@@ -19,7 +19,7 @@ def load_file(filepath: str) -> str:
         logger.error(f"File {filepath} not found, returning None");
         return None
 
-def load_program(vertex_file_path: str, fragment_file_path: str) -> int:
+def load_program(vertex_file_path: str, fragment_file_path: str) -> int | None:
     """Load and compile shaders and use them in a program.
 
     Args:
@@ -38,9 +38,15 @@ def load_program(vertex_file_path: str, fragment_file_path: str) -> int:
 
     try:
         vertex_shader = compileShader(v_file, GL_VERTEX_SHADER)
+        
+    except Exception as e:
+        logger.error(f"Error compiling shader {vertex_file_path}: {e}")
+        return None
+    
+    try:
         fragment_shader = compileShader(f_file, GL_FRAGMENT_SHADER)
     except Exception as e:
-        logger.error(f"Error compiling shaders: {e}")
+        logger.error(f"Error compiling shader {fragment_file_path}: {e}")
         return None
 
     try:

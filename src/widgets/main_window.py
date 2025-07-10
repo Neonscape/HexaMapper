@@ -1,11 +1,12 @@
 from PyQt6.QtWidgets import QWidget, QMainWindow, QLayout, QHBoxLayout, QGridLayout, QMenuBar, QStatusBar, QToolBar
-from .map_panel import MapPanel
+from widgets.map_panel import MapPanel2D
+from modules.map_engine import MapEngine2D
 from loguru import logger
 
 class MainAppWindow(QMainWindow):
-    
-    def __init__(self, title: str ="Main Window", size: tuple[int, int] = (800, 600)):
+    def __init__(self, engine_2d: MapEngine2D, title: str ="Main Window", size: tuple[int, int] = (800, 600)):
         super().__init__()
+        self._engine = engine_2d
         self._layout : QLayout = None
         self._menuBar: QMenuBar = None
         self._toolBar : QToolBar = None
@@ -35,4 +36,7 @@ class MainAppWindow(QMainWindow):
         self._layout = QHBoxLayout(container)
         self.setCentralWidget(container)
         
-        self.add_children("map", MapPanel())
+        map_panel = MapPanel2D()
+        self.add_children("map", map_panel)
+        self.children["map"].init_panel(self._engine)
+        self._engine.map_panel = map_panel

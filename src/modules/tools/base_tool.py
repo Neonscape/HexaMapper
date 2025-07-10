@@ -1,9 +1,9 @@
-from widgets.map_panel import MapPanel
+from widgets.map_panel import MapPanel2D
 from abc import abstractmethod, ABC
 from PyQt6.QtCore import QEvent
 
 class ToolBase(ABC):
-    def __init__(self, canvas:MapPanel):
+    def __init__(self, canvas:MapPanel2D):
         self.canvas = canvas
         
     @abstractmethod

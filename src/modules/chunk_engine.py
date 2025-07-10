@@ -1,11 +1,11 @@
 from modules.config import app_config
-from widgets.map_panel import MapPanel
+from widgets.map_panel import MapPanel2D
 from loguru import logger
 import numpy as np
 
 CHUNK_SIZE = app_config.hex_map_engine.chunk_size
 DATA_DIMENSIONS = app_config.hex_map_engine.data_dimensions
-DEFAULT_CELL_COLOR = app_config.hex_map_engine.default_cell_color
+DEFAULT_CELL_COLOR = app_config.hex_map_custom.default_cell_color
 
 class ChunkEngine:
     def __init__(self):
@@ -34,7 +34,7 @@ class ChunkEngine:
             data (np.ndarray): the data to write
         """
         logger.debug(f"Setting cell data at {global_coords} to {data}")
-        chunk_x, chunk_y, local_x, local_y = MapPanel.global_coord_to_chunk_coord(global_coords)
+        chunk_x, chunk_y, local_x, local_y = MapPanel2D.global_coord_to_chunk_coord(global_coords)
         chunk_data = self._get_or_create_chunk((chunk_x, chunk_y))
         chunk_data[local_x, local_y] = data
         self.dirty_chunks.add((chunk_x, chunk_y))

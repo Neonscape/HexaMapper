@@ -1,4 +1,5 @@
-from schema import *
+from modules.schema import *
+from loguru import logger
 import yaml
 
 is_config_loaded = False
@@ -9,6 +10,7 @@ config_path = "config/config.yml"
 
 def load_config():
     global app_config
+    logger.info(f"Loading config from {config_path}...")
     try:
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
