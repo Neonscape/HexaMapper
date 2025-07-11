@@ -15,16 +15,32 @@ from modules.map_helpers import *
 from loguru import logger
 
 class DrawMode(Enum):
+    """
+    Enum for specifying the drawing mode for hexagons.
+    """
     DRAW_FILLED = 0
     DRAW_OUTLINE = 1
 
 class Camera2D:
+    """
+    Represents a 2D camera with position and zoom level.
+    """
     pos: QPointF = QPointF(0.0, 0.0)
     zoom: float = 0.1
     
 
 class MapEngine2D:
+    """
+    The core 2D map rendering engine responsible for managing map data,
+    OpenGL drawing operations, camera control, and tool interactions.
+    """
     def __init__(self, map_panel: MapPanel2D = None):
+        """
+        Initializes the MapEngine2D.
+
+        :param map_panel: The MapPanel2D instance associated with this engine.
+        :type map_panel: MapPanel2D
+        """
         self.map_panel = map_panel
         self.chunk_manager : ChunkEngine = ChunkEngine()
         self.history_manager = HistoryManager()
@@ -38,20 +54,26 @@ class MapEngine2D:
         self._register_tools()
 
     def _register_tools(self):
+        """
+        Registers the available tools with the tool manager.
+        """
         self.tool_manager.register_tool("draw", DrawTool(self))
         self.tool_manager.set_active_tool("draw")
         
     def init_engine(self):
+        """
+        Initializes the OpenGL engine by creating shared geometries.
+        """
         self._create_geometry()
         
     def _create_geometry(self):
-        """creates the shared geometries (hex, background quad) for instanced rendering.
+        """
+        Creates the shared geometries (hex, background quad, cursor quad) for instanced rendering.
+        These geometries are uploaded to the GPU as VBOs and VAOs.
         """
         
         # Shared 2D hexagon geometries
-        
         filled_vertices = [(0.0, 0.0)]
-        
         outline_vertices = []
         
         for i in range(6):
@@ -60,7 +82,6 @@ class MapEngine2D:
             y = conf.hex_map_engine.hex_radius * np.sin(angle)
             filled_vertices.append((x, y))
             outline_vertices.append((x, y))
-            
             
         # To close the loop for triangle fan
         filled_vertices.append(filled_vertices[1])
@@ -79,7 +100,6 @@ class MapEngine2D:
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         
         # Background quad
-        
         w, h = self.map_panel.width(), self.map_panel.height()
         
         bg_vertices = np.array([
@@ -128,7 +148,13 @@ class MapEngine2D:
         glBindVertexArray(0)
 
     def update_background(self, w: float, h: float):
-        """update the background based on new panel size.
+        """
+        Updates the background quad's geometry based on the new panel size.
+
+        :param w: New width of the map panel.
+        :type w: float
+        :param h: New height of the map panel.
+        :type h: float
         """
         
         background_vertices = np.array([
@@ -143,6 +169,9 @@ class MapEngine2D:
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         
     def draw_gradient_background(self):
+        """
+        Draws a gradient background using the background shader.
+        """
         
         glDisable(GL_DEPTH_TEST)
         
@@ -160,6 +189,12 @@ class MapEngine2D:
         glEnable(GL_DEPTH_TEST)
         
     def draw_hex_chunk_filled(self, chunk_buffer: dict[str, int]):
+        """
+        Draws the filled hexagons for a given chunk.
+
+        :param chunk_buffer: Dictionary containing OpenGL buffer IDs for the chunk.
+        :type chunk_buffer: dict[str, int]
+        """
         
         pg = sm.get_program("hex_shader")
         glUseProgram(pg)
@@ -183,6 +218,12 @@ class MapEngine2D:
         glUseProgram(0)
         
     def draw_hex_chunk_outline(self, chunk_buffer: dict[str, int]):
+        """
+        Draws the outlines of hexagons for a given chunk.
+
+        :param chunk_buffer: Dictionary containing OpenGL buffer IDs for the chunk.
+        :type chunk_buffer: dict[str, int]
+        """
 
         pg = sm.get_program("hex_shader")
         glUseProgram(pg)
@@ -206,6 +247,9 @@ class MapEngine2D:
         glUseProgram(0)
     
     def update_and_render_chunks(self):
+        """
+        Updates dirty chunks and renders all visible chunks.
+        """
         dirty_chunks = self.chunk_manager.get_and_clear_dirty_chunks()
         
         for chunk_coord in dirty_chunks:
@@ -222,6 +266,12 @@ class MapEngine2D:
             self.draw_hex_chunk_outline(self.chunk_buffers[chunk_coord])
 
     def draw_tool_visual_aid(self, mouse_world_pos: QPointF):
+        """
+        Draws a visual aid for the active tool, such as a circle for the draw tool.
+
+        :param mouse_world_pos: The current mouse position in world coordinates.
+        :type mouse_world_pos: QPointF
+        """
         tool = self.tool_manager.get_active_tool()
         if not tool:
             return
@@ -256,7 +306,12 @@ class MapEngine2D:
             glUseProgram(0)
 
     def _update_chunk_instance_buffer(self, chunk_coord: tuple[int, int]):
-        """Generates instance data for a chunk (pos, color) and upload it to GPU."""
+        """
+        Generates instance data (position, color) for a given chunk and uploads it to the GPU.
+
+        :param chunk_coord: The (x, y) coordinates of the chunk.
+        :type chunk_coord: tuple[int, int]
+        """
         logger.debug(f"Updating chunk instance buffer for chunk {chunk_coord}")
         
         DATA_DIMENSIONS = conf.hex_map_engine.data_dimensions
@@ -269,7 +324,7 @@ class MapEngine2D:
             glDeleteVertexArrays(1, [outline_vao_id])
             
         chunk_data = self.chunk_manager.get_chunk_data(chunk_coord)
-        # FIX: Ensure the numpy array has the correct float32 dtype for OpenGL
+        # Ensure the numpy array has the correct float32 dtype for OpenGL
         instance_data = np.array(self._generate_chunk_instance_data(chunk_coord, chunk_data), dtype=np.float32)
         
         
@@ -319,7 +374,16 @@ class MapEngine2D:
         }
     
     def _generate_chunk_instance_data(self, chunk_coord: tuple[int, int], chunk_data: np.ndarray):
-        """Generate data for a given chunk instance."""
+        """
+        Generates instance data (center position and color) for all cells within a given chunk.
+
+        :param chunk_coord: The (x, y) coordinates of the chunk.
+        :type chunk_coord: tuple[int, int]
+        :param chunk_data: The NumPy array containing cell data for the chunk.
+        :type chunk_data: np.ndarray
+        :return: A list of interleaved position and color data for instanced rendering.
+        :rtype: list
+        """
         
         CHUNK_SIZE = conf.hex_map_engine.chunk_size
         
@@ -336,15 +400,17 @@ class MapEngine2D:
                 color = chunk_data[lx, ly]
                 
                 instance_data.extend([center_x, center_y, *color])
-                # FIX: Removed performance-hindering print statement
         return instance_data
     
-    # helper functions: matrices
-    
     def _create_projection_matrix(self):
-        """Create projection matrix for the camera.
+        """
+        Creates the projection matrix for the camera.
+
         The projection matrix transforms coordinates from view space (camera-oriented space)
         to Normalized Device Coordinates (NDCs).
+
+        :return: A 4x4 NumPy array representing the projection matrix.
+        :rtype: np.ndarray
         """
         w, h = self.map_panel.width(), self.map_panel.height()
         
@@ -361,8 +427,13 @@ class MapEngine2D:
         ])
     
     def _create_view_matrix(self):
-        """Create view matrix for the camera.
+        """
+        Creates the view matrix for the camera.
+
         The view matrix transforms coordinates from world space to view space.
+
+        :return: A 4x4 NumPy array representing the view matrix.
+        :rtype: np.ndarray
         """
         return np.array([
             [1, 0, 0, -self.camera.pos.x()],
@@ -372,10 +443,11 @@ class MapEngine2D:
         ])
     
     def _get_visible_chunks(self):
-        """Return the coordinates of the visible chunks.
+        """
+        Calculates and returns the coordinates of the chunks currently visible in the viewport.
 
-        Returns:
-            _type_: _description_
+        :return: A set of (chunk_x, chunk_y) tuples for visible chunks.
+        :rtype: set[tuple[int, int]]
         """
         tl_world = self._screen_to_world((0, 0))
         br_world = self._screen_to_world((self.map_panel.width(), self.map_panel.height()))
@@ -399,10 +471,16 @@ class MapEngine2D:
         return visible
     
     def _screen_to_world(self, screen_pos: tuple[float, float]):
-        """Converts screen position to world position (for mouse actions).
+        """
+        Converts a screen position (pixel coordinates) to a world position.
 
-        Args:
-            screen_pos (tuple[float, float]): _description_
+        This is useful for translating mouse input coordinates into the 2D world space
+        of the map.
+
+        :param screen_pos: A tuple (x, y) representing the screen coordinates.
+        :type screen_pos: tuple[float, float]
+        :return: A QPointF representing the corresponding world coordinates.
+        :rtype: QPointF
         """
         
         w, h = self.map_panel.width(), self.map_panel.height()
@@ -413,11 +491,15 @@ class MapEngine2D:
         return QPointF(world_pos[0], world_pos[1])
     
     def move_view(self, last_view_pos: QPointF, current_view_pos: QPointF):
-        """moves the camera based on two view locations.
+        """
+        Moves the camera view based on the difference between two screen positions.
 
-        Args:
-            last_view_pos (QPointF): last position the cursor is on the screen
-            current_view_pos (QPointF): current position the cursor is on the screen
+        This is typically used for panning the map.
+
+        :param last_view_pos: The previous screen position of the cursor.
+        :type last_view_pos: QPointF
+        :param current_view_pos: The current screen position of the cursor.
+        :type current_view_pos: QPointF
         """
         
         delta_x = current_view_pos.x() - last_view_pos.x()
@@ -436,10 +518,11 @@ class MapEngine2D:
         self.map_panel.update()
         
     def zoom(self, zooming_up: bool):
-        """Zooms in or out based on the zoom factor.
+        """
+        Adjusts the camera's zoom level.
 
-        Args:
-            zooming_up (bool): True if zooming in, False if zooming out
+        :param zooming_up: True to zoom in (increase zoom level), False to zoom out (decrease zoom level).
+        :type zooming_up: bool
         """
         
         MIN_ZOOM = conf.hex_map_view.min_zoom

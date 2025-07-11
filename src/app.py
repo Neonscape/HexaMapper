@@ -9,12 +9,21 @@ engine = MapEngine2D()
 window = MainAppWindow(engine)
 
 def startup_tasks():
+    """
+    Performs any tasks required at application startup.
+    """
     pass
 
 def shutdown_tasks():
+    """
+    Performs any tasks required at application shutdown.
+    """
     pass
 
 def run():
+    """
+    Runs the main application loop.
+    """
     startup_tasks()
     sys.exit(app.exec())
     shutdown_tasks()

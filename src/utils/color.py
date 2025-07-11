@@ -22,11 +22,13 @@ class RGBAColor:
         """
         Initializes an RGBA color from various formats.
 
-        Args:
-            value: The color value, which can be:
-                - A hex string (e.g., '#FF0000', '#FF000080').
-                - A list/tuple of 3 or 4 integers (0-255).
-                - A list/tuple of 3 or 4 floats (0.0-1.0).
+        :param value: The color value, which can be:
+            - A hex string (e.g., '#FF0000', '#FF000080').
+            - A list/tuple of 3 or 4 integers (0-255).
+            - A list/tuple of 3 or 4 floats (0.0-1.0).
+        :type value: ColorInput
+        :raises ValueError: If the input format is invalid or values are out of range.
+        :raises TypeError: If the input type is unsupported.
         """
         if isinstance(value, str):
             # Parse from hex string
@@ -71,12 +73,19 @@ class RGBAColor:
 
     @staticmethod
     def _clamp(value: float) -> float:
-        """Clamps a float value between 0.0 and 1.0."""
+        """
+        Clamps a float value between 0.0 and 1.0.
+
+        :param value: The float value to clamp.
+        :type value: float
+        :return: The clamped float value.
+        :rtype: float
+        """
         return max(0.0, min(1.0, value))
 
-    # --- Properties for R, G, B, A ---
     @property
     def r(self) -> float:
+        """The red component of the color (0.0-1.0)."""
         return self._r
 
     @r.setter
@@ -85,6 +94,7 @@ class RGBAColor:
 
     @property
     def g(self) -> float:
+        """The green component of the color (0.0-1.0)."""
         return self._g
 
     @g.setter
@@ -93,6 +103,7 @@ class RGBAColor:
 
     @property
     def b(self) -> float:
+        """The blue component of the color (0.0-1.0)."""
         return self._b
 
     @b.setter
@@ -101,22 +112,21 @@ class RGBAColor:
 
     @property
     def a(self) -> float:
+        """The alpha component of the color (0.0-1.0)."""
         return self._a
 
     @a.setter
     def a(self, value: float):
         self._a = self._clamp(value)
 
-    # --- Conversion Methods ---
     def to_hex(self, include_alpha: bool = True) -> str:
         """
         Converts the color to a hex string.
 
-        Args:
-            include_alpha: If True, includes the alpha channel in the hex string.
-
-        Returns:
-            The hex string representation (e.g., '#RRGGBBAA').
+        :param include_alpha: If True, includes the alpha channel in the hex string.
+        :type include_alpha: bool
+        :return: The hex string representation (e.g., '#RRGGBBAA').
+        :rtype: str
         """
         r_hex = f"{int(self.r * 255):02x}"
         g_hex = f"{int(self.g * 255):02x}"
@@ -127,7 +137,12 @@ class RGBAColor:
         return f"#{r_hex}{g_hex}{b_hex}"
 
     def to_bytes(self) -> Tuple[int, int, int, int]:
-        """Converts the color to a tuple of byte values (0-255)."""
+        """
+        Converts the color to a tuple of byte values (0-255).
+
+        :return: A tuple (r, g, b, a) where each component is an integer from 0 to 255.
+        :rtype: Tuple[int, int, int, int]
+        """
         return (
             int(self.r * 255),
             int(self.g * 255),
@@ -136,21 +151,26 @@ class RGBAColor:
         )
 
     def to_floats(self) -> Tuple[float, float, float, float]:
-        """Converts the color to a tuple of float values (0.0-1.0)."""
+        """
+        Converts the color to a tuple of float values (0.0-1.0).
+
+        :return: A tuple (r, g, b, a) where each component is a float from 0.0 to 1.0.
+        :rtype: Tuple[float, float, float, float]
+        """
         return (self.r, self.g, self.b, self.a)
 
-    # --- Color Operations ---
     def mix(self, other: 'RGBAColor', weight: float = 0.5) -> 'RGBAColor':
         """
         Mixes this color with another color using linear interpolation.
 
-        Args:
-            other: The other RGBA color to mix with.
-            weight: The mixing weight. 0.0 gives this color, 1.0 gives the
-                    other color, and 0.5 gives an even mix.
-
-        Returns:
-            A new RGBA instance representing the mixed color.
+        :param other: The other RGBA color to mix with.
+        :type other: RGBAColor
+        :param weight: The mixing weight. 0.0 gives this color, 1.0 gives the
+                       other color, and 0.5 gives an even mix. Clamped between 0.0 and 1.0.
+        :type weight: float
+        :return: A new RGBAColor instance representing the mixed color.
+        :rtype: RGBAColor
+        :raises TypeError: If `other` is not an RGBAColor instance.
         """
         if not isinstance(other, RGBAColor):
             raise TypeError("Can only mix with another RGBA instance.")
@@ -164,40 +184,70 @@ class RGBAColor:
         
         return RGBAColor([mixed_r, mixed_g, mixed_b, mixed_a])
 
-    # --- Magic Methods for Python Integration ---
     def __repr__(self) -> str:
+        """
+        Returns a developer-friendly string representation of the RGBAColor object.
+        """
         return f"RGBA(value='{self.to_hex()}')"
 
     def __str__(self) -> str:
+        """
+        Returns a user-friendly string representation of the RGBAColor object (its hex value).
+        """
         return self.to_hex()
 
     def __len__(self) -> int:
+        """
+        Returns the number of color components (always 4 for RGBA).
+        """
         return 4
 
     def __iter__(self):
-        """Allows unpacking like `r, g, b, a = my_color`."""
+        """
+        Allows unpacking the color components like `r, g, b, a = my_color`.
+        """
         yield self.r
         yield self.g
         yield self.b
         yield self.a
 
     def __getitem__(self, index: int) -> float:
-        """Allows accessing components by index."""
+        """
+        Allows accessing color components by index (0=r, 1=g, 2=b, 3=a).
+
+        :param index: The index of the component to retrieve.
+        :type index: int
+        :return: The float value of the specified component.
+        :rtype: float
+        """
         return self.to_floats()[index]
     
     def __eq__(self, other: Any) -> bool:
-        """Checks for equality with another RGBA instance."""
+        """
+        Checks for equality with another RGBAColor instance based on byte values.
+
+        :param other: The object to compare with.
+        :type other: Any
+        :return: True if the colors are equal, False otherwise.
+        :rtype: bool
+        """
         if not isinstance(other, RGBAColor):
             return NotImplemented
         return self.to_bytes() == other.to_bytes()
 
-    # --- Pydantic Integration ---
     @classmethod
     def __get_pydantic_core_schema__(
         cls, source_type: Any, handler: Any
     ) -> core_schema.CoreSchema:
         """
         Defines how Pydantic should validate and serialize this class.
+
+        :param source_type: The type being validated.
+        :type source_type: Any
+        :param handler: The Pydantic schema handler.
+        :type handler: Any
+        :return: A Pydantic CoreSchema for validation and serialization.
+        :rtype: core_schema.CoreSchema
         """
         # This function will be called by Pydantic to validate input
         def validate(value: ColorInput) -> 'RGBAColor':

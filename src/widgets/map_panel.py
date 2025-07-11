@@ -14,28 +14,45 @@ CHUNK_SIZE = cf.hex_map_engine.chunk_size
 
 
 class MapPanel2D(QOpenGLWidget):
+    """
+    A QOpenGLWidget subclass that serves as the main display panel for the 2D hex map.
+    It handles OpenGL rendering, mouse interactions, and integrates with the MapEngine2D.
+    """
     def __init__(self, parent=None):
+        """
+        Initializes the MapPanel2D.
+
+        :param parent: The parent widget, defaults to None.
+        :type parent: QWidget, optional
+        """
         super().__init__(parent)
         self.initUI()
         self.engine = None
         self.event_handler = None
-        self.installEventFilter(self.event_handler)
+        # The event handler is installed in init_panel, so this line is redundant here.
+        # self.installEventFilter(self.event_handler) 
         self.last_mouse_pos = None
         self.setMouseTracking(True)
         
         format = QSurfaceFormat()
         format.setRenderableType(QSurfaceFormat.RenderableType.OpenGL)
-        format.setProfile(QSurfaceFormat.OpenGLContextProfile.CompatibilityProfile) # Or CompatibilityProfile, depending on your OpenGL usage
-        format.setVersion(4, 1) # Request a modern OpenGL version if possible
-        format.setSamples(8) # Request 8 samples for MSAA (common values: 2, 4, 8, 16)
+        # Or CompatibilityProfile, depending on your OpenGL usage
+        format.setProfile(QSurfaceFormat.OpenGLContextProfile.CompatibilityProfile) 
+        # Request a modern OpenGL version if possible
+        format.setVersion(4, 1) 
+        # Request 8 samples for MSAA (common values: 2, 4, 8, 16)
+        format.setSamples(8) 
         self.setFormat(format)
         
 
     def initializeGL(self):
+        """
+        Initializes the OpenGL rendering context.
+        This function is called once before the first call to paintGL() or resizeGL().
+        """
         # Prepare OpenGL environment and the canvas
         self.makeCurrent()
         
-        # TODO: Refactor for more OpenGL Widgets
         sm.compile_all_programs()
         
         self.engine.init_engine()
@@ -44,23 +61,40 @@ class MapPanel2D(QOpenGLWidget):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
     def init_panel(self, engine):
+        """
+        Initializes the map panel with the given map engine and sets up the event handler.
+
+        :param engine: The MapEngine2D instance to associate with this panel.
+        :type engine: MapEngine2D
+        """
         self.engine = engine
         self.event_handler = MapPanel2DEventHandler(self.engine)
         self.installEventFilter(self.event_handler)
         
-    # TODO: implement application style management & style file load
-
     def initUI(self):
+        """
+        Initializes the user interface components and styling for the panel.
+        """
         self.setStyleSheet("background-color: #333333;")
 
     def resizeGL(self, w, h):
+        """
+        Resizes the OpenGL viewport when the widget is resized.
+
+        :param w: The new width of the widget.
+        :type w: int
+        :param h: The new height of the widget.
+        :type h: int
+        """
         glViewport(0, 0, w, h)
         self.engine.update_background(w, h)
 
     def paintGL(self):
+        """
+        Paints the OpenGL content. This function is called whenever the widget needs to be updated.
+        """
         glClear(GL_COLOR_BUFFER_BIT)
         
-        # self.engine.draw_gradient_background()
         self.engine.update_and_render_chunks()
 
         if self.last_mouse_pos:
@@ -68,6 +102,12 @@ class MapPanel2D(QOpenGLWidget):
             self.engine.draw_tool_visual_aid(mouse_world_pos)
 
     def mouseMoveEvent(self, event):
+        """
+        Handles mouse move events to update the last mouse position and trigger repaints.
+
+        :param event: The mouse event.
+        :type event: QMouseEvent
+        """
         self.last_mouse_pos = event.pos()
         super().mouseMoveEvent(event)
         self.update()

@@ -9,6 +9,10 @@ app_config = ApplicationConfig()
 config_path = "config/config.yml"
 
 def load_config():
+    """
+    Loads the application configuration from a YAML file.
+    If the file is not found or parsing fails, default configuration values are used.
+    """
     global app_config
     logger.info(f"Loading config from {config_path}...")
     try:

@@ -4,30 +4,31 @@ import os
 from loguru import logger
 
 def load_file(filepath: str) -> str:
-    """Load a file and return its content.
+    """
+    Loads a file from the given filepath and returns its content as a string.
 
-    Args:
-        filepath (str): _description_
-
-    Returns:
-        str: _description_
+    :param filepath: The path to the file.
+    :type filepath: str
+    :return: The content of the file, or None if the file is not found.
+    :rtype: str | None
     """
     try:
-        file = open(filepath, 'r')
-        return file.read()
+        with open(filepath, 'r') as file:
+            return file.read()
     except FileNotFoundError:
-        logger.error(f"File {filepath} not found, returning None");
+        logger.error(f"File {filepath} not found, returning None")
         return None
 
 def load_program(vertex_file_path: str, fragment_file_path: str) -> int | None:
-    """Load and compile shaders and use them in a program.
+    """
+    Loads, compiles, and links vertex and fragment shaders into an OpenGL program.
 
-    Args:
-        vertex_file_path (str): _description_
-        fragment_file_path (str): _description_
-
-    Returns:
-        int: _description_
+    :param vertex_file_path: The path to the vertex shader file.
+    :type vertex_file_path: str
+    :param fragment_file_path: The path to the fragment shader file.
+    :type fragment_file_path: str
+    :return: The OpenGL program ID if compilation and linking are successful, otherwise None.
+    :rtype: int | None
     """
     
     v_file, f_file = load_file(vertex_file_path), load_file(fragment_file_path)

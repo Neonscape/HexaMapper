@@ -1,17 +1,24 @@
-# helper functions: cell-transform
+"""
+Helper functions for converting between different coordinate systems
+(global coordinates, chunk coordinates, world positions, screen positions)
+for the hexagonal map.
+"""
 
 from modules.config import app_config as conf
 from PyQt6.QtCore import QPointF
+from math import sqrt
 
 
 def get_center_position_from_global_coord(global_coord: tuple[int, int]) -> tuple[float, float]:
-    """Finds the world position of the given cell at the global coord.
-    Args:
-        global_coord (tuple[int, int]): _description_
-    Returns:
-        tuple[float, float]: _description_
     """
-    from math import sqrt
+    Calculates the world position (center) of a hexagon given its global coordinates.
+    Uses an odd-q vertical layout for hexagonal grid.
+
+    :param global_coord: A tuple (col, row) representing the global coordinates of the cell.
+    :type global_coord: tuple[int, int]
+    :return: A tuple (x, y) representing the world position of the cell's center.
+    :rtype: tuple[float, float]
+    """
     
     HEX_RADIUS = conf.hex_map_engine.hex_radius
     
@@ -23,11 +30,14 @@ def get_center_position_from_global_coord(global_coord: tuple[int, int]) -> tupl
     
 
 def global_coord_to_chunk_coord(global_coord: tuple[int, int]) -> tuple[int, int, int, int]:
-    """Finds which chunk the given cell is in and where is it in the chunk.
-    Args:
-        global_coord (tuple[int, int]): the global coord of the cell
-    Returns:
-        tuple[int, int, int, int]: [chunk_x, chunk_y, local_x, local_y]
+    """
+    Determines which chunk a given global cell coordinate belongs to,
+    and its local coordinates within that chunk.
+
+    :param global_coord: The global (x, y) coordinates of the cell.
+    :type global_coord: tuple[int, int]
+    :return: A tuple containing (chunk_x, chunk_y, local_x, local_y).
+    :rtype: tuple[int, int, int, int]
     """
     CHUNK_SIZE = conf.hex_map_engine.chunk_size
     
@@ -38,15 +48,21 @@ def global_coord_to_chunk_coord(global_coord: tuple[int, int]) -> tuple[int, int
     
 
 def global_pos_to_global_coord(global_pos: QPointF) -> tuple[int, int]:
-    """Finds the global coord of the cell at the given world position."""
-    from math import sqrt
+    """
+    Converts a world position (QPointF) to the nearest global hexagonal cell coordinate.
+
+    :param global_pos: The world position.
+    :type global_pos: QPointF
+    :return: A tuple (col, row) representing the global coordinates of the nearest cell.
+    :rtype: tuple[int, int]
+    """
     
     HEX_RADIUS = conf.hex_map_engine.hex_radius
     
-    # CORRECTED: Use proper horizontal scaling factor (1.5 * HEX_RADIUS)
+    # Use proper horizontal scaling factor (1.5 * HEX_RADIUS)
     col_approx = global_pos.x() / (1.5 * HEX_RADIUS)
     
-    # CORRECTED: Use proper vertical scaling factor (sqrt(3) * HEX_RADIUS)
+    # Use proper vertical scaling factor (sqrt(3) * HEX_RADIUS)
     row_approx = global_pos.y() / (sqrt(3) * HEX_RADIUS)
     
     col = round(col_approx)
