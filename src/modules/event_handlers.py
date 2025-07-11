@@ -66,18 +66,14 @@ class MapPanel2DEventHandler(QObject):
             else: # Mouse moved without any button pressed (due to setMouseTracking(True) on widget)
                 pass
             
+            self.last_mouse_pos = current_pos
+            
             return False # Allow target widget to receive move event
 
         # --- Handle Mouse Wheel Events ---
         elif event.type() == QEvent.Type.Wheel:
             wheel_event: QWheelEvent = event
-            angle_delta_y = wheel_event.angleDelta().y()
-            pixel_delta_y = wheel_event.pixelDelta().y()
-
-            if angle_delta_y > 0:
-                scroll_direction = "Up (away from user)"
-            else:
-                scroll_direction = "Down (towards user)"
+            self.engine.zoom(zooming_up=wheel_event.angleDelta().y() > 0)
 
             return True # Consume the wheel event; prevent target widget from processing it further
 

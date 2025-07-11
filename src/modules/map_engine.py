@@ -363,17 +363,17 @@ class MapEngine2D:
         self.camera.pos.setY(self.camera.pos.y() + delta_y * world_dy_per_pixel)
         self.map_panel.update()
         
-    def zoom(self, isZoomingUp: bool):
+    def zoom(self, zooming_up: bool):
         """Zooms in or out based on the zoom factor.
 
         Args:
-            isZoomingUp (bool): True if zooming in, False if zooming out
+            zooming_up (bool): True if zooming in, False if zooming out
         """
         
         MIN_ZOOM = conf.hex_map_view.min_zoom
         MAX_ZOOM = conf.hex_map_view.max_zoom
         
-        if isZoomingUp:
+        if zooming_up:
             self.camera.zoom *= 1.1
         else:
             self.camera.zoom /= 1.1
@@ -392,3 +392,4 @@ class MapEngine2D:
         world_pos = self._screen_to_world((screen_pos.x(), screen_pos.y()))
         world_coord = MapPanel2D.global_pos_to_global_coord(world_pos)
         self.chunk_manager.set_cell_data(world_coord, color)
+        self.map_panel.update()
