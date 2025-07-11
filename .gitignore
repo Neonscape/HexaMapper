@@ -13,3 +13,5 @@ __pycache__/
 *.dist-info
 .vscode/
 src/test.py
+build/
+dist/

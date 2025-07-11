@@ -1,4 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QMainWindow, QLayout, QHBoxLayout, QGridLayout, QMenuBar, QStatusBar, QToolBar
+from PyQt6.QtWidgets import (
+    QWidget, QMainWindow, QLayout, QHBoxLayout, QGridLayout, QMenuBar, QStatusBar
+)
 from PyQt6.QtGui import QAction, QKeySequence
 from widgets.map_panel import MapPanel2D
 from modules.map_engine import MapEngine2D
@@ -10,7 +12,6 @@ class MainAppWindow(QMainWindow):
         self._engine = engine_2d
         self._layout : QLayout = None
         self._menuBar: QMenuBar = None
-        self._toolBar : QToolBar = None
         self._statusBar : QStatusBar = None
         self._container : QWidget = None
         self.children : dict[str, QWidget] = {}
@@ -42,8 +43,8 @@ class MainAppWindow(QMainWindow):
         
         self._statusBar = self.statusBar()
         
-        self._toolBar = QToolBar()
-        self.addToolBar(self._toolBar)
+        # self._toolBar = QToolBar()
+        # self.addToolBar(self._toolBar)
         
         container = QWidget()
         self._container = container

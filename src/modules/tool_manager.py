@@ -2,7 +2,7 @@ from PyQt6.QtCore import QEvent
 from modules.tools.base_tool import ToolBase
 
 class ToolManager:
-    def __init__(self, map_engine):
+    def __init__(self, map_engine = None):
         self.map_engine = map_engine
         self.tools: dict[str, ToolBase] = {}
         self.active_tool: ToolBase | None = None
@@ -34,3 +34,5 @@ class ToolManager:
     def handle_mouse_release(self, event: QEvent):
         if self.active_tool:
             self.active_tool.mouse_release(event)
+
+tool_manager = ToolManager()

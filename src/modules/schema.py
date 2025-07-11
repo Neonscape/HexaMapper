@@ -31,6 +31,7 @@ class HexMapViewConfig(BaseModel):
 class HexMapShaderConfig(BaseModel):
     unit: ShaderConfig = ShaderConfig(vertex="src/shaders/hex/vsh.glsl", fragment="src/shaders/hex/fsh.glsl")
     background:ShaderConfig = ShaderConfig(vertex="src/shaders/background/vsh.glsl", fragment="src/shaders/background/fsh.glsl")
+    cursor: ShaderConfig = ShaderConfig(vertex="src/shaders/cursor/vsh.glsl", fragment="src/shaders/cursor/fsh.glsl")
     
 
 class ApplicationConfig(BaseModel):

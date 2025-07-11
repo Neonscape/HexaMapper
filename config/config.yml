@@ -13,7 +13,7 @@ hex_map_engine:
 hex_map_custom:
   outline_color: "#FFFFFF6A"
   default_cell_color: "#888888FF"
-  outline_width: 2.0
+  outline_width: 1.0
 
 hex_map_view:
   min_zoom: 0.02
@@ -26,3 +26,6 @@ hex_map_shaders:
   background:
     vertex: "src/shaders/background/vsh.glsl"
     fragment: "src/shaders/background/fsh.glsl"
+  cursor:
+    vertex: "src/shaders/cursor/vsh.glsl"
+    fragment: "src/shaders/cursor/fsh.glsl"

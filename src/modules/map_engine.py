@@ -5,7 +5,7 @@ from modules.shader_manager import shader_manager as sm
 from modules.config import app_config as conf
 from modules.chunk_engine import ChunkEngine
 from modules.history_manager import HistoryManager
-from modules.tool_manager import ToolManager
+from modules.tool_manager import tool_manager as tm
 from modules.tools.draw_tool import DrawTool
 from OpenGL.GL import *
 from PyQt6.QtCore import QPointF
@@ -28,10 +28,11 @@ class MapEngine2D:
         self.map_panel = map_panel
         self.chunk_manager : ChunkEngine = ChunkEngine()
         self.history_manager = HistoryManager()
-        self.tool_manager = ToolManager(self)
+        self.tool_manager = tm
+        tm.map_engine = self
         sm.register_program("hex_shader", conf.hex_map_shaders.unit.vertex, conf.hex_map_shaders.unit.fragment)
         sm.register_program("bg_shader", conf.hex_map_shaders.background.vertex, conf.hex_map_shaders.background.fragment)
-        sm.register_program("cursor_shader", "src/shaders/cursor/vsh.glsl", "src/shaders/cursor/fsh.glsl")
+        sm.register_program("cursor_shader", conf.hex_map_shaders.cursor.vertex, conf.hex_map_shaders.cursor.fragment)
         self.chunk_buffers: dict[tuple[int, int], dict[str, int]] = {}
         self.camera = Camera2D()
         self._register_tools()
@@ -85,6 +86,8 @@ class MapEngine2D:
             0.0, 0.0,
             w, 0.0,
             w, h,
+            0.0, 0.0,
+            w, h,
             0.0, h
             ], dtype=np.float32)
         
@@ -105,6 +108,8 @@ class MapEngine2D:
         cursor_vertices = np.array([
             -1.0, -1.0,
             1.0, -1.0,
+            1.0, 1.0,
+            -1.0, -1.0,
             1.0, 1.0,
             -1.0, 1.0
         ], dtype=np.float32)
@@ -148,7 +153,7 @@ class MapEngine2D:
         glUniform1f(glGetUniformLocation(pg, "viewportHeight"), float(self.map_panel.height()))
         
         glBindVertexArray(sm.get_vao("bg_quad"))
-        glDrawArrays(GL_QUADS, 0, 4)
+        glDrawArrays(GL_TRIANGLES, 0, 6)
         glBindVertexArray(0)
         
         glUseProgram(0)
@@ -245,7 +250,7 @@ class MapEngine2D:
             glUniform1f(glGetUniformLocation(pg, "thickness"), 0.05) # TODO: make this configurable
 
             glBindVertexArray(sm.get_vao("cursor_quad"))
-            glDrawArrays(GL_QUADS, 0, 4)
+            glDrawArrays(GL_TRIANGLES, 0, 6)
 
             glBindVertexArray(0)
             glUseProgram(0)

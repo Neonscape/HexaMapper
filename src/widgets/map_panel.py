@@ -1,6 +1,7 @@
 from math import sqrt
 from PyQt6.QtCore import QPointF
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
+from PyQt6.QtGui import QSurfaceFormat
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from modules import event_handlers
@@ -21,6 +22,13 @@ class MapPanel2D(QOpenGLWidget):
         self.installEventFilter(self.event_handler)
         self.last_mouse_pos = None
         self.setMouseTracking(True)
+        
+        format = QSurfaceFormat()
+        format.setRenderableType(QSurfaceFormat.RenderableType.OpenGL)
+        format.setProfile(QSurfaceFormat.OpenGLContextProfile.CompatibilityProfile) # Or CompatibilityProfile, depending on your OpenGL usage
+        format.setVersion(4, 1) # Request a modern OpenGL version if possible
+        format.setSamples(8) # Request 8 samples for MSAA (common values: 2, 4, 8, 16)
+        self.setFormat(format)
         
 
     def initializeGL(self):
