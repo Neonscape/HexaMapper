@@ -19,6 +19,8 @@ class MapPanel2D(QOpenGLWidget):
         self.engine = None
         self.event_handler = None
         self.installEventFilter(self.event_handler)
+        self.last_mouse_pos = None
+        self.setMouseTracking(True)
         
 
     def initializeGL(self):
@@ -52,3 +54,12 @@ class MapPanel2D(QOpenGLWidget):
         
         # self.engine.draw_gradient_background()
         self.engine.update_and_render_chunks()
+
+        if self.last_mouse_pos:
+            mouse_world_pos = self.engine._screen_to_world((self.last_mouse_pos.x(), self.last_mouse_pos.y()))
+            self.engine.draw_tool_visual_aid(mouse_world_pos)
+
+    def mouseMoveEvent(self, event):
+        self.last_mouse_pos = event.pos()
+        super().mouseMoveEvent(event)
+        self.update()

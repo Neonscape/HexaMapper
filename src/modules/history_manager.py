@@ -1,30 +1,6 @@
-from abc import ABC, abstractmethod
 from copy import copy
 from typing import List
-import numpy as np
-from modules.chunk_engine import ChunkEngine
-
-class Command(ABC):
-    @abstractmethod
-    def execute(self):
-        ...
-
-    @abstractmethod
-    def undo(self):
-        ...
-
-class PaintCellCommand(Command):
-    def __init__(self, chunk_engine: ChunkEngine, global_coords: tuple[int, int], new_color: np.ndarray):
-        self.chunk_engine = chunk_engine
-        self.global_coords = global_coords
-        self.new_color = new_color
-        self.previous_color = self.chunk_engine.get_cell_data(global_coords).copy()
-
-    def execute(self):
-        self.chunk_engine.set_cell_data(self.global_coords, self.new_color)
-
-    def undo(self):
-        self.chunk_engine.set_cell_data(self.global_coords, self.previous_color)
+from modules.commands.base_command import Command
 
 class HistoryManager:
     def __init__(self):
@@ -39,6 +15,7 @@ class HistoryManager:
     def execute(self, command: Command):
         command.execute()
         self.command_buffer.append(command)
+        self.redo_stack.clear()
         
     def finish_action(self):
         if self.command_buffer:

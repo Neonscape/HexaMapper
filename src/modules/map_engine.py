@@ -31,6 +31,7 @@ class MapEngine2D:
         self.tool_manager = ToolManager(self)
         sm.register_program("hex_shader", conf.hex_map_shaders.unit.vertex, conf.hex_map_shaders.unit.fragment)
         sm.register_program("bg_shader", conf.hex_map_shaders.background.vertex, conf.hex_map_shaders.background.fragment)
+        sm.register_program("cursor_shader", "src/shaders/cursor/vsh.glsl", "src/shaders/cursor/fsh.glsl")
         self.chunk_buffers: dict[tuple[int, int], dict[str, int]] = {}
         self.camera = Camera2D()
         self._register_tools()
@@ -99,7 +100,28 @@ class MapEngine2D:
         
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
-    
+
+        # Cursor quad
+        cursor_vertices = np.array([
+            -1.0, -1.0,
+            1.0, -1.0,
+            1.0, 1.0,
+            -1.0, 1.0
+        ], dtype=np.float32)
+
+        cursor_vao = sm.add_vao("cursor_quad")
+        cursor_vbo = sm.add_vbo("cursor_quad")
+
+        glBindVertexArray(cursor_vao)
+        glBindBuffer(GL_ARRAY_BUFFER, cursor_vbo)
+        glBufferData(GL_ARRAY_BUFFER, cursor_vertices.nbytes, cursor_vertices, GL_STATIC_DRAW)
+
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), None)
+        glEnableVertexAttribArray(0)
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+
     def update_background(self, w: float, h: float):
         """update the background based on new panel size.
         """
@@ -193,7 +215,40 @@ class MapEngine2D:
                 self._update_chunk_instance_buffer(chunk_coord)
             self.draw_hex_chunk_filled(self.chunk_buffers[chunk_coord])
             self.draw_hex_chunk_outline(self.chunk_buffers[chunk_coord])
-                
+
+    def draw_tool_visual_aid(self, mouse_world_pos: QPointF):
+        tool = self.tool_manager.get_active_tool()
+        if not tool:
+            return
+
+        visual_aid_info = tool.get_visual_aid_info()
+        if not visual_aid_info:
+            return
+
+        shape = visual_aid_info.get("shape")
+        if shape == "circle":
+            pg = sm.get_program("cursor_shader")
+            glUseProgram(pg)
+
+            proj_mat = self._create_projection_matrix()
+            view_mat = self._create_view_matrix()
+
+            glUniformMatrix4fv(glGetUniformLocation(pg, "projection"), 1, GL_TRUE, proj_mat)
+            glUniformMatrix4fv(glGetUniformLocation(pg, "view"), 1, GL_TRUE, view_mat)
+
+            radius = visual_aid_info.get("radius", 1.0) * conf.hex_map_engine.hex_radius
+            color = visual_aid_info.get("color", (1.0, 1.0, 1.0, 1.0))
+            
+            glUniform2f(glGetUniformLocation(pg, "center_pos"), mouse_world_pos.x(), mouse_world_pos.y())
+            glUniform1f(glGetUniformLocation(pg, "radius"), radius)
+            glUniform4f(glGetUniformLocation(pg, "color"), *color)
+            glUniform1f(glGetUniformLocation(pg, "thickness"), 0.05) # TODO: make this configurable
+
+            glBindVertexArray(sm.get_vao("cursor_quad"))
+            glDrawArrays(GL_QUADS, 0, 4)
+
+            glBindVertexArray(0)
+            glUseProgram(0)
 
     def _update_chunk_instance_buffer(self, chunk_coord: tuple[int, int]):
         """Generates instance data for a chunk (pos, color) and upload it to GPU."""

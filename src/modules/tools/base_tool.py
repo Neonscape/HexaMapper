@@ -22,5 +22,12 @@ class ToolBase(ABC):
     def activate(self):
         ...
 
+    def get_visual_aid_info(self):
+        """
+        Returns information for rendering a visual aid for the tool.
+        If None, no visual aid is drawn.
+        """
+        return None
+
     def deactivate(self):
         ...

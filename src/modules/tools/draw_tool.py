@@ -3,7 +3,7 @@ from utils.color import RGBAColor as Color
 from modules.config import app_config
 from modules.tools.base_tool import ToolBase
 from PyQt6.QtCore import QEvent
-from modules.history_manager import PaintCellCommand
+from modules.commands.paint_cell_command import PaintCellCommand
 from modules.map_helpers import global_pos_to_global_coord
 import numpy as np
 from typing import override
@@ -39,4 +39,11 @@ class DrawTool(ToolBase):
     @override
     def mouse_release(self, event: QEvent):
         self.map_engine.history_manager.finish_action()
-    
+
+    @override
+    def get_visual_aid_info(self):
+        return {
+            "shape": "circle",
+            "radius": self.settings.radius,
+            "color": (1.0, 1.0, 1.0, 1.0)
+        }

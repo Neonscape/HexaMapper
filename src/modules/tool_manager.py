@@ -9,6 +9,9 @@ class ToolManager:
 
     def register_tool(self, name: str, tool: ToolBase):
         self.tools[name] = tool
+        
+    def get_active_tool(self):
+        return self.active_tool
 
     def set_active_tool(self, name: str):
         if self.active_tool:
