@@ -1,18 +1,26 @@
-from widgets.map_panel import MapPanel2D
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from abc import abstractmethod, ABC
 from PyQt6.QtCore import QEvent
 
-class ToolBase(ABC):
-    def __init__(self, canvas:MapPanel2D):
-        self.canvas = canvas
-        
-    @abstractmethod
-    def use(self, event:QEvent):
-        """this method is called whenever the tool is called from events.
-        Do the work in this function (e.g. draw to canvas for the draw tool)
+if TYPE_CHECKING:
+    from modules.map_engine import MapEngine2D
 
-        Args:
-            event (QEvent): the event that triggered the tool
-        """
+class ToolBase(ABC):
+    def __init__(self, map_engine:MapEngine2D):
+        self.map_engine = map_engine
+        
+    def mouse_press(self, event:QEvent):
         ...
-    
+
+    def mouse_move(self, event:QEvent):
+        ...
+
+    def mouse_release(self, event:QEvent):
+        ...
+
+    def activate(self):
+        ...
+
+    def deactivate(self):
+        ...

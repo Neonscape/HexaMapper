@@ -1,5 +1,5 @@
 from modules.config import app_config
-from widgets.map_panel import MapPanel2D
+from modules.map_helpers import *
 from loguru import logger
 import numpy as np
 
@@ -34,11 +34,16 @@ class ChunkEngine:
             data (np.ndarray): the data to write
         """
         logger.debug(f"Setting cell data at {global_coords} to {data}")
-        chunk_x, chunk_y, local_x, local_y = MapPanel2D.global_coord_to_chunk_coord(global_coords)
+        chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(global_coords)
         chunk_data = self._get_or_create_chunk((chunk_x, chunk_y))
         chunk_data[local_x, local_y] = data
         self.dirty_chunks.add((chunk_x, chunk_y))
-        
+
+    def get_cell_data(self, global_coords: tuple[int, int]) -> np.ndarray:
+        """Get a cell's data."""
+        chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(global_coords)
+        chunk_data = self._get_or_create_chunk((chunk_x, chunk_y))
+        return chunk_data[local_x, local_y]
         
     def get_chunk_data(self, chunk_coord: tuple[int, int]) -> np.ndarray:
         """Get a chunk's data.

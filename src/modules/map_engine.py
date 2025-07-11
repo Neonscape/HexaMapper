@@ -1,12 +1,17 @@
 from utils.color import RGBAColor
+from utils.color import RGBAColor
 from widgets.map_panel import MapPanel2D
 from modules.shader_manager import shader_manager as sm
 from modules.config import app_config as conf
 from modules.chunk_engine import ChunkEngine
+from modules.history_manager import HistoryManager
+from modules.tool_manager import ToolManager
+from modules.tools.draw_tool import DrawTool
 from OpenGL.GL import *
 from PyQt6.QtCore import QPointF
 import numpy as np
 from enum import Enum
+from modules.map_helpers import *
 from loguru import logger
 
 class DrawMode(Enum):
@@ -22,10 +27,17 @@ class MapEngine2D:
     def __init__(self, map_panel: MapPanel2D = None):
         self.map_panel = map_panel
         self.chunk_manager : ChunkEngine = ChunkEngine()
+        self.history_manager = HistoryManager()
+        self.tool_manager = ToolManager(self)
         sm.register_program("hex_shader", conf.hex_map_shaders.unit.vertex, conf.hex_map_shaders.unit.fragment)
         sm.register_program("bg_shader", conf.hex_map_shaders.background.vertex, conf.hex_map_shaders.background.fragment)
         self.chunk_buffers: dict[tuple[int, int], dict[str, int]] = {}
         self.camera = Camera2D()
+        self._register_tools()
+
+    def _register_tools(self):
+        self.tool_manager.register_tool("draw", DrawTool(self))
+        self.tool_manager.set_active_tool("draw")
         
     def init_engine(self):
         self._create_geometry()
@@ -260,7 +272,7 @@ class MapEngine2D:
                 global_x = chunk_origin_x + lx
                 global_y = chunk_origin_y + ly
                 
-                center_x, center_y = MapPanel2D.get_center_position_from_global_coord((global_x, global_y))
+                center_x, center_y = get_center_position_from_global_coord((global_x, global_y))
                 color = chunk_data[lx, ly]
                 
                 instance_data.extend([center_x, center_y, *color])
@@ -308,11 +320,11 @@ class MapEngine2D:
         tl_world = self._screen_to_world((0, 0))
         br_world = self._screen_to_world((self.map_panel.width(), self.map_panel.height()))
         
-        min_gx, min_gy = MapPanel2D.global_pos_to_global_coord(tl_world)
-        max_gx, max_gy = MapPanel2D.global_pos_to_global_coord(br_world)
+        min_gx, min_gy = global_pos_to_global_coord(tl_world)
+        max_gx, max_gy = global_pos_to_global_coord(br_world)
         
-        min_chunk_x, min_chunk_y, _, _ = MapPanel2D.global_coord_to_chunk_coord((min_gx, min_gy))
-        max_chunk_x, max_chunk_y, _, _ = MapPanel2D.global_coord_to_chunk_coord((max_gx, max_gy))
+        min_chunk_x, min_chunk_y, _, _ = global_coord_to_chunk_coord((min_gx, min_gy))
+        max_chunk_x, max_chunk_y, _, _ = global_coord_to_chunk_coord((max_gx, max_gy))
         
         if min_chunk_x > max_chunk_x:
             min_chunk_x, max_chunk_x = max_chunk_x, min_chunk_x
@@ -379,17 +391,4 @@ class MapEngine2D:
             self.camera.zoom /= 1.1
             
         self.camera.zoom = max(MIN_ZOOM, min(self.camera.zoom, MAX_ZOOM))
-        self.map_panel.update()
-        
-    def paint_on_screen(self, screen_pos: QPointF, color: RGBAColor):
-        # TODO: refactor this with the tool system
-        """Paints a hexagon on the screen at the given position.
-
-        Args:
-            screen_pos (QPointF): Position to paint the hexagon.
-            color (RGBAColor): Color to paint the hexagon.
-        """
-        world_pos = self._screen_to_world((screen_pos.x(), screen_pos.y()))
-        world_coord = MapPanel2D.global_pos_to_global_coord(world_pos)
-        self.chunk_manager.set_cell_data(world_coord, color)
         self.map_panel.update()

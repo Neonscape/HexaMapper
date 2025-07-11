@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import QWidget, QMainWindow, QLayout, QHBoxLayout, QGridLayout, QMenuBar, QStatusBar, QToolBar
+from PyQt6.QtGui import QAction, QKeySequence
 from widgets.map_panel import MapPanel2D
 from modules.map_engine import MapEngine2D
 from loguru import logger
@@ -24,7 +25,20 @@ class MainAppWindow(QMainWindow):
         self._layout.addWidget(widget)
         
     def initUI(self):
-        self._menuNar = self.menuBar()
+        self._menuBar = self.menuBar()
+        
+        # Add Edit Menu for Undo/Redo
+        edit_menu = self._menuBar.addMenu("Edit")
+        
+        undo_action = QAction("Undo", self)
+        undo_action.setShortcut(QKeySequence.StandardKey.Undo)
+        undo_action.triggered.connect(self.undo)
+        edit_menu.addAction(undo_action)
+        
+        redo_action = QAction("Redo", self)
+        redo_action.setShortcut(QKeySequence.StandardKey.Redo)
+        redo_action.triggered.connect(self.redo)
+        edit_menu.addAction(redo_action)
         
         self._statusBar = self.statusBar()
         
@@ -40,3 +54,11 @@ class MainAppWindow(QMainWindow):
         self.add_children("map", map_panel)
         self.children["map"].init_panel(self._engine)
         self._engine.map_panel = map_panel
+
+    def undo(self):
+        self._engine.history_manager.undo()
+        self._engine.map_panel.update()
+
+    def redo(self):
+        self._engine.history_manager.redo()
+        self._engine.map_panel.update()
