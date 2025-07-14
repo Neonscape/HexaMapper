@@ -3,13 +3,16 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QAction, QKeySequence
 from widgets.map_panel import MapPanel2D
+from widgets.toolbar import CustomToolbar
 from modules.map_engine import MapEngine2D
+from modules.tool_manager import ToolManager # Added import
 from loguru import logger
 
 class MainAppWindow(QMainWindow):
-    def __init__(self, engine_2d: MapEngine2D, title: str ="Main Window", size: tuple[int, int] = (800, 600)):
+    def __init__(self, engine_2d: MapEngine2D, tool_manager: ToolManager, title: str ="Main Window", size: tuple[int, int] = (800, 600)):
         super().__init__()
         self._engine = engine_2d
+        self._tool_manager = tool_manager # Stored tool_manager
         self._layout : QLayout = None
         self._menuBar: QMenuBar = None
         self._statusBar : QStatusBar = None
@@ -43,15 +46,22 @@ class MainAppWindow(QMainWindow):
         
         self._statusBar = self.statusBar()
         
-        # self._toolBar = QToolBar()
-        # self.addToolBar(self._toolBar)
+        self._toolBar = CustomToolbar("Tools")
+        self.addToolBar(self._toolBar)
+
+        # Register tools
+        self._toolBar.register_tool_btn(
+            tooltip="Draw Tool",
+            icon="draw",
+            callback=lambda: self._tool_manager.set_active_tool("draw_tool")
+        )
         
-        container = QWidget()
+        container = QWidget(self)
         self._container = container
         self._layout = QHBoxLayout(container)
         self.setCentralWidget(container)
         
-        map_panel = MapPanel2D()
+        map_panel = MapPanel2D(container)
         self.add_children("map", map_panel)
         self.children["map"].init_panel(self._engine)
         self._engine.map_panel = map_panel

@@ -30,9 +30,11 @@ class CustomToolbar(QToolBar):
         :type callback: Callable
         :param args: Additional keyword arguments.
         """
-        btn = QPushButton(im.get_icon(icon), self)
+        btn = QPushButton(im.get_icon(icon), "", self) # Corrected QPushButton constructor arguments
         btn.setToolTip(tooltip)
         btn.clicked.connect(callback)
+        self.addWidget(btn)
+        self.buttons[tooltip] = btn
         
     def initUI(self):
         """

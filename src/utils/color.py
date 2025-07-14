@@ -183,6 +183,15 @@ class RGBAColor:
         mixed_a = self.a * (1 - w) + other.a * w
         
         return RGBAColor([mixed_r, mixed_g, mixed_b, mixed_a])
+    
+    def is_transparent(self):
+        """
+        Checks if the color is fully transparent (alpha=0.0).
+
+        :return: True if the color is fully transparent, False otherwise.
+        :rtype: bool
+        """
+        return self.a == 0.0
 
     def __repr__(self) -> str:
         """

@@ -84,5 +84,5 @@ class DrawTool(ToolBase):
         return {
             "shape": "circle",
             "radius": self.settings.radius,
-            "color": (1.0, 1.0, 1.0, 1.0)
+            "color": (1.0, 1.0, 1.0, 0.5)
         }

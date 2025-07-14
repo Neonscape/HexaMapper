@@ -17,8 +17,9 @@ class ChunkEngine:
         """
         Initializes the ChunkEngine.
         """
-        self.chunks: dict[tuple[int, int], np.ndarray] = {}
-        self.dirty_chunks : set[tuple[int, int]] = set()
+        self.chunks: dict[tuple[int, int], np.ndarray] = {}             # data of all chunks
+        self.modified_cells : set[tuple[int, int]] = set()   # only user-modified chunks in here
+        self.dirty_chunks : set[tuple[int, int]] = set()                # temporary buffer of modified chunks
         
     def _get_or_create_chunk(self, chunk_coord: tuple[int, int]) -> np.ndarray:
         """
@@ -50,6 +51,24 @@ class ChunkEngine:
         chunk_data = self._get_or_create_chunk((chunk_x, chunk_y))
         chunk_data[local_x, local_y] = data
         self.dirty_chunks.add((chunk_x, chunk_y))
+        self.modified_cells.add(global_coords)
+        
+    def delete_cell_data(self, global_coords: tuple[int, int]) -> None:
+        """
+        Deletes the data (e.g., color) for a specific cell at global coordinates.
+        Marks the containing chunk as dirty.
+        
+        :param global_coords: The global (x, y) coordinates of the cell.
+        :type global_coords: tuple[int, int]
+        """
+        if global_coords not in self.modified_cells:
+            return
+        chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(global_coords)
+        chunk_data = self._get_or_create_chunk((chunk_x, chunk_y))
+        chunk_data[local_x, local_y] = DEFAULT_CELL_COLOR
+        self.dirty_chunks.add((chunk_x, chunk_y))
+        self.modified_cells.remove(global_coords)
+        
 
     def get_cell_data(self, global_coords: tuple[int, int]) -> np.ndarray:
         """
