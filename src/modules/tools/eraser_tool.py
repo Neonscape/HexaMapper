@@ -1,8 +1,14 @@
+from typing import override
+from modules.map_helpers import global_pos_to_global_coord
 from modules.tools.base_tool import ToolBase
+from modules.commands.erase_cell_command import EraseCellCommand
 from pydantic import BaseModel
+from PyQt6.QtCore import QEvent
 
 class EraserToolSettings(BaseModel):
     radius: float = 1.0
+    
+
 
 class EraserTool(ToolBase):
     """
@@ -13,6 +19,27 @@ class EraserTool(ToolBase):
         super().__init__(map_engine)
         self.settings = EraserToolSettings()
 
+    @override
+    def mouse_press(self, event: QEvent):
+        pass
+
+    @override
+    def mouse_move(self, event: QEvent):
+        world_pos = self.map_engine.screen_to_world((event.pos().x(), event.pos().y()))
+        world_coord = global_pos_to_global_coord(world_pos, self.map_engine.config.hex_map_engine.hex_radius)
+        command = EraseCellCommand(
+            self.map_engine.chunk_engine,
+            global_coords=world_coord
+        )
+        
+        self.map_engine.history_manager.execute(command)
+        self.map_engine.map_panel.update()
+        
+    @override
+    def mouse_release(self, event:QEvent):
+        self.map_engine.history_manager.finish_action()
+        
+    
     def get_visual_aid_info(self):
         return {
             "shape": "circle",

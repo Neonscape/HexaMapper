@@ -23,21 +23,19 @@ class PaintCellCommand(Command):
         self.global_coords = global_coords
         self.new_color = new_color
         self.previous_color = self.chunk_engine.get_cell_data(global_coords).copy()
-        self.is_first_paint = False     # This smells bad... maybe we should refactor this later.
+        self.is_new = (global_coords not in self.chunk_engine.modified_cells)
 
     def execute(self):
         """
         Executes the command, setting the cell's color to the new color.
         """
-        if self.global_coords not in self.chunk_engine.modified_cells: # first time modifying a cell
-            self.is_first_paint = True
         self.chunk_engine.set_cell_data(self.global_coords, self.new_color)
 
     def undo(self):
         """
         Undoes the command, reverting the cell's color to its previous state.
         """
-        if self.is_first_paint:
+        if self.is_new:
             self.chunk_engine.delete_cell_data(self.global_coords)
         else:
             self.chunk_engine.set_cell_data(self.global_coords, self.previous_color)

@@ -33,6 +33,7 @@ class ChunkEngine:
             data_dims = self.config.hex_map_engine.data_dimensions
             default_color = self.config.hex_map_custom.default_cell_color
             self.chunks[chunk_coord] = np.full((chunk_size, chunk_size, data_dims), default_color, dtype=np.float32)
+            return self.chunks[chunk_coord]
         return self.chunks[chunk_coord]
     
     

@@ -33,7 +33,7 @@ class HexMapCustomConfig(BaseModel):
     """
     Configuration schema for custom visual properties of the hex map.
     """
-    outline_color: Color = Color("#9999996A")
+    outline_color: Color = Color("#FFFFFFFF")
     default_cell_color: Color = Color("#888888FF")
     outline_width: float = 2.0
     
