@@ -1,6 +1,7 @@
 from typing import override, Literal, Optional
 from PyQt6.QtCore import QObject, QEvent, Qt, QPoint
 from PyQt6.QtGui import QMouseEvent, QWheelEvent
+from loguru import logger
 
 class MapPanel2DEventHandler(QObject):
     @override
@@ -69,6 +70,8 @@ class MapPanel2DEventHandler(QObject):
                 pass
             
             self.last_mouse_pos = current_pos
+            
+            self.engine.map_panel.update()
             
             return False # Allow target widget to receive move event
 

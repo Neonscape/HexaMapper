@@ -73,22 +73,19 @@ class MapPanel2D(QOpenGLWidget):
         """
         Paints the OpenGL content. This function is called whenever the widget needs to be updated.
         """
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glClear(GL_COLOR_BUFFER_BIT)
         
-        self.engine.draw_gradient_background()
+        # self.engine.draw_gradient_background()
+        
         self.engine.update_and_render_chunks()
-
-        if self.last_mouse_pos:
-            mouse_world_pos = self.engine.screen_to_world((self.last_mouse_pos.x(), self.last_mouse_pos.y()))
+        
+        if self.event_handler.last_mouse_pos:
+            pos = self.event_handler.last_mouse_pos
+            mouse_world_pos = self.engine.screen_to_world((pos.x(), pos.y()))
             self.engine.draw_tool_visual_aid(mouse_world_pos)
+        
+        
+        
+        
 
-    def mouseMoveEvent(self, event):
-        """
-        Handles mouse move events to update the last mouse position and trigger repaints.
-
-        :param event: The mouse event.
-        :type event: QMouseEvent
-        """
-        self.last_mouse_pos = event.pos()
-        super().mouseMoveEvent(event)
-        self.update()
+        

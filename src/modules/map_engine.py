@@ -182,6 +182,8 @@ class MapEngine2D:
         """
         
         glDisable(GL_DEPTH_TEST)
+        glDepthMask(GL_FALSE)
+        
         
         pg = self.shader_manager.get_program("bg_shader")
         glUseProgram(pg)
@@ -194,7 +196,10 @@ class MapEngine2D:
         glBindVertexArray(0)
         
         glUseProgram(0)
+        
+        glDepthMask(GL_TRUE)
         glEnable(GL_DEPTH_TEST)
+        
         
     def draw_hex_chunk_filled(self, chunk_buffer: dict[str, int]):
         """
@@ -287,7 +292,7 @@ class MapEngine2D:
         visual_aid_info = tool.get_visual_aid_info()
         if not visual_aid_info:
             return
-
+        
         shape = visual_aid_info.get("shape")
         if shape == "circle":
             pg = self.shader_manager.get_program("cursor_shader")
