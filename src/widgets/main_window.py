@@ -57,6 +57,11 @@ class MainAppWindow(QMainWindow):
             tooltip="Eraser Tool",
             callback=lambda: self.tool_manager.set_active_tool("erase")
         )
+        toolbar.register_tool_btn(
+            name="pipe",
+            tooltip="Dropper Tool",
+            callback=lambda: self.tool_manager.set_active_tool("dropper")
+        )
         
         # --- Central Widget ---
         container = QWidget(self)

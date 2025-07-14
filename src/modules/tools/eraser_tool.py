@@ -13,7 +13,6 @@ class EraserToolSettings(BaseModel):
 class EraserTool(ToolBase):
     """
     A tool for erasing cells on the hex map.
-    (Currently a placeholder).
     """
     def __init__(self, map_engine):
         super().__init__(map_engine)

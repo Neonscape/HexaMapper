@@ -60,12 +60,12 @@ class MapPanel2DEventHandler(QObject):
             
             current_pos = mouse_event.pos()
             
-            if self.drag_button == "Left" and self.dragging:
+            if self.drag_button == "Middle" and self.dragging:
                 self.engine.move_view(self.last_mouse_pos, current_pos)
             elif self.drag_button == "Right" and self.dragging:
                 if self.engine.tool_manager:
                     self.engine.tool_manager.handle_mouse_move(mouse_event)
-            else: # Mouse moved without any button pressed (due to setMouseTracking(True) on widget)
+            else: 
                 pass
             
             self.last_mouse_pos = current_pos

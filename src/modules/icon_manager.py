@@ -10,6 +10,7 @@ class IconManager:
             "save": OutlineIcon.DEVICE_FLOPPY,
             "draw": OutlineIcon.BRUSH,
             "erase": OutlineIcon.ERASER,
+            "pipe": OutlineIcon.TEST_PIPE
             # add more icons here
         }
         self._init_icons()

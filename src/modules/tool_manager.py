@@ -37,6 +37,17 @@ class ToolManager:
         """
         return self.active_tool
 
+    def get_tool(self, name: str) -> ToolBase | None:
+        """
+        Retrieves a registered tool by its name.
+
+        :param name: The name of the tool to retrieve.
+        :type name: str
+        :return: The tool instance, or None if not found.
+        :rtype: ToolBase | None
+        """
+        return self.tools.get(name)
+
     def set_active_tool(self, name: str):
         """
         Sets the active tool by its registered name. Deactivates the current tool
