@@ -266,14 +266,12 @@ class MapEngine2D:
         dirty_chunks = self.chunk_engine.get_and_clear_dirty_chunks()
         
         for chunk_coord in dirty_chunks:
-            logger.debug("Updating chunk instance buffer for dirty chunks...")
             self._update_chunk_instance_buffer(chunk_coord)
                 
                 
         visible_chunks = self._get_visible_chunks()
         for chunk_coord in visible_chunks:
             if chunk_coord not in self.chunk_buffers:
-                logger.debug(f"Visible chunk {chunk_coord} not in chunk buffer, constructing buffer for it...")
                 self._update_chunk_instance_buffer(chunk_coord)
             self.draw_hex_chunk_filled(self.chunk_buffers[chunk_coord])
             self.draw_hex_chunk_outline(self.chunk_buffers[chunk_coord])
@@ -325,7 +323,6 @@ class MapEngine2D:
         :param chunk_coord: The (x, y) coordinates of the chunk.
         :type chunk_coord: tuple[int, int]
         """
-        logger.debug(f"Updating chunk instance buffer for chunk {chunk_coord}")
         
         DATA_DIMENSIONS = self.config.hex_map_engine.data_dimensions
         
@@ -379,7 +376,6 @@ class MapEngine2D:
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
         
-        logger.debug(f"Finished instance buffer update for chunk {chunk_coord}")
         self.chunk_buffers[chunk_coord] = {
             "filled_vao": filled_vao,
             "instance_vbo": instance_vbo,

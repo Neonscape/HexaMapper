@@ -47,7 +47,6 @@ class ChunkEngine:
         :param data: The data (e.g., RGBA color array) to write to the cell.
         :type data: np.ndarray
         """
-        logger.debug(f"Setting cell data at {global_coords} to {data}")
         chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(global_coords, self.config.hex_map_engine.chunk_size)
         chunk_data = self._get_or_create_chunk((chunk_x, chunk_y))
         chunk_data[local_x, local_y] = data

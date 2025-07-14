@@ -2,6 +2,7 @@ from OpenGL.GL import *
 from OpenGL.GL.shaders import compileShader, compileProgram
 import os
 from loguru import logger
+from .resource_path import get_resource_path
 
 def load_file(filepath: str) -> str:
     """
@@ -12,11 +13,12 @@ def load_file(filepath: str) -> str:
     :return: The content of the file, or None if the file is not found.
     :rtype: str | None
     """
+    absolute_filepath = get_resource_path(filepath)
     try:
-        with open(filepath, 'r') as file:
+        with open(absolute_filepath, 'r') as file:
             return file.read()
     except FileNotFoundError:
-        logger.error(f"File {filepath} not found, returning None")
+        logger.error(f"File {absolute_filepath} not found, returning None")
         return None
 
 def load_program(vertex_file_path: str, fragment_file_path: str) -> int | None:

@@ -1,8 +1,9 @@
 from modules.schema import *
 from loguru import logger
 import yaml
+from utils.resource_path import get_resource_path
 
-config_path = "config/config.yml"
+config_path = get_resource_path("config.yml")
 
 def load_config() -> ApplicationConfig | None:
     """
