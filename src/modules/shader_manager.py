@@ -154,5 +154,3 @@ class ShaderManager:
         for vao_id in self.vaos.values():
             glDeleteVertexArrays(1, [vao_id])
         self.vaos.clear()
-
-shader_manager = ShaderManager()

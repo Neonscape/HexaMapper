@@ -83,5 +83,3 @@ class ToolManager:
         """
         if self.active_tool:
             self.active_tool.mouse_release(event)
-
-tool_manager = ToolManager()

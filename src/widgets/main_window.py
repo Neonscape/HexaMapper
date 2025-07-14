@@ -1,75 +1,75 @@
 from PyQt6.QtWidgets import (
-    QWidget, QMainWindow, QLayout, QHBoxLayout, QGridLayout, QMenuBar, QStatusBar
+    QWidget, QMainWindow, QLayout, QHBoxLayout, QMenuBar, QStatusBar
 )
 from PyQt6.QtGui import QAction, QKeySequence
 from widgets.map_panel import MapPanel2D
 from widgets.toolbar import CustomToolbar
 from modules.map_engine import MapEngine2D
-from modules.tool_manager import ToolManager # Added import
-from loguru import logger
+from modules.tool_manager import ToolManager
+from modules.icon_manager import IconManager
 
 class MainAppWindow(QMainWindow):
-    def __init__(self, engine_2d: MapEngine2D, tool_manager: ToolManager, title: str ="Main Window", size: tuple[int, int] = (800, 600)):
+    def __init__(self, engine: MapEngine2D, tool_manager: ToolManager, icon_manager: IconManager, title: str ="HexaMapper", size: tuple[int, int] = (1200, 800)):
         super().__init__()
-        self._engine = engine_2d
-        self._tool_manager = tool_manager # Stored tool_manager
-        self._layout : QLayout = None
-        self._menuBar: QMenuBar = None
-        self._statusBar : QStatusBar = None
-        self._container : QWidget = None
-        self.children : dict[str, QWidget] = {}
+        self.engine = engine
+        self.tool_manager = tool_manager
+        self.icon_manager = icon_manager
+
+        self.map_panel: MapPanel2D | None = None
+        
         self.setWindowTitle(title)
         self.resize(size[0], size[1])
-        self.initUI()
-        self.show()
-    
-    def add_children(self, name: str, widget: QWidget): 
-        # TODO: implement richer control over layout
-        self.children[name] = widget
-        self._layout.addWidget(widget)
+        self._init_ui()
+
+    def get_map_panel(self) -> MapPanel2D:
+        return self.map_panel
         
-    def initUI(self):
-        self._menuBar = self.menuBar()
+    def _init_ui(self):
+        # --- Menu Bar ---
+        menu_bar = self.menuBar()
+        edit_menu = menu_bar.addMenu("Edit")
         
-        # Add Edit Menu for Undo/Redo
-        edit_menu = self._menuBar.addMenu("Edit")
-        
-        undo_action = QAction("Undo", self)
+        undo_action = QAction(self.icon_manager.get_icon("undo"), "Undo", self)
         undo_action.setShortcut(QKeySequence.StandardKey.Undo)
         undo_action.triggered.connect(self.undo)
         edit_menu.addAction(undo_action)
         
-        redo_action = QAction("Redo", self)
+        redo_action = QAction(self.icon_manager.get_icon("redo"), "Redo", self)
         redo_action.setShortcut(QKeySequence.StandardKey.Redo)
         redo_action.triggered.connect(self.redo)
         edit_menu.addAction(redo_action)
         
-        self._statusBar = self.statusBar()
+        # --- Status Bar ---
+        self.statusBar()
         
-        self._toolBar = CustomToolbar("Tools")
-        self.addToolBar(self._toolBar)
+        # --- Toolbar ---
+        toolbar = CustomToolbar("Tools", self.icon_manager)
+        self.addToolBar(toolbar)
 
-        # Register tools
-        self._toolBar.register_tool_btn(
+        # Register tools to the toolbar
+        toolbar.register_tool_btn(
+            name="draw",
             tooltip="Draw Tool",
-            icon="draw",
-            callback=lambda: self._tool_manager.set_active_tool("draw_tool")
+            callback=lambda: self.tool_manager.set_active_tool("draw")
+        )
+        toolbar.register_tool_btn(
+            name="erase",
+            tooltip="Eraser Tool",
+            callback=lambda: self.tool_manager.set_active_tool("erase")
         )
         
+        # --- Central Widget ---
         container = QWidget(self)
-        self._container = container
-        self._layout = QHBoxLayout(container)
+        layout = QHBoxLayout(container)
         self.setCentralWidget(container)
         
-        map_panel = MapPanel2D(container)
-        self.add_children("map", map_panel)
-        self.children["map"].init_panel(self._engine)
-        self._engine.map_panel = map_panel
+        self.map_panel = MapPanel2D(self.engine, container)
+        layout.addWidget(self.map_panel)
 
     def undo(self):
-        self._engine.history_manager.undo()
-        self._engine.map_panel.update()
+        self.engine.history_manager.undo()
+        self.map_panel.update()
 
     def redo(self):
-        self._engine.history_manager.redo()
-        self._engine.map_panel.update()
+        self.engine.history_manager.redo()
+        self.map_panel.update()

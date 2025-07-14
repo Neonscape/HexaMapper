@@ -1,18 +1,21 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from utils.color import RGBAColor
-from utils.color import RGBAColor
-from widgets.map_panel import MapPanel2D
-from modules.shader_manager import shader_manager as sm
-from modules.config import app_config as conf
+from modules.shader_manager import ShaderManager
+from modules.config import ApplicationConfig
 from modules.chunk_engine import ChunkEngine
 from modules.history_manager import HistoryManager
-from modules.tool_manager import tool_manager as tm
+from modules.tool_manager import ToolManager
 from modules.tools.draw_tool import DrawTool
 from OpenGL.GL import *
 from PyQt6.QtCore import QPointF
 import numpy as np
 from enum import Enum
-from modules.map_helpers import *
+from modules.map_helpers import get_center_position_from_global_coord, global_coord_to_chunk_coord, global_pos_to_global_coord
 from loguru import logger
+
+if TYPE_CHECKING:
+    from widgets.map_panel import MapPanel2D
 
 class DrawMode(Enum):
     """
@@ -34,31 +37,36 @@ class MapEngine2D:
     The core 2D map rendering engine responsible for managing map data,
     OpenGL drawing operations, camera control, and tool interactions.
     """
-    def __init__(self, map_panel: MapPanel2D = None):
+    def __init__(self, config: ApplicationConfig, chunk_engine: ChunkEngine, history_manager: HistoryManager, shader_manager: ShaderManager):
         """
         Initializes the MapEngine2D.
-
-        :param map_panel: The MapPanel2D instance associated with this engine.
-        :type map_panel: MapPanel2D
         """
-        self.map_panel = map_panel
-        self.chunk_manager : ChunkEngine = ChunkEngine()
-        self.history_manager = HistoryManager()
-        self.tool_manager = tm
-        tm.map_engine = self
-        sm.register_program("hex_shader", conf.hex_map_shaders.unit.vertex, conf.hex_map_shaders.unit.fragment)
-        sm.register_program("bg_shader", conf.hex_map_shaders.background.vertex, conf.hex_map_shaders.background.fragment)
-        sm.register_program("cursor_shader", conf.hex_map_shaders.cursor.vertex, conf.hex_map_shaders.cursor.fragment)
+        self.config = config
+        self.chunk_engine = chunk_engine
+        self.history_manager = history_manager
+        self.shader_manager = shader_manager
+        
+        self.map_panel: MapPanel2D | None = None # Set later via set_map_panel
+        self.tool_manager: ToolManager | None = None # Set later via set_tool_manager
+
+        self.shader_manager.register_program("hex_shader", self.config.hex_map_shaders.unit.vertex, self.config.hex_map_shaders.unit.fragment)
+        self.shader_manager.register_program("bg_shader", self.config.hex_map_shaders.background.vertex, self.config.hex_map_shaders.background.fragment)
+        self.shader_manager.register_program("cursor_shader", self.config.hex_map_shaders.cursor.vertex, self.config.hex_map_shaders.cursor.fragment)
+        
         self.chunk_buffers: dict[tuple[int, int], dict[str, int]] = {}
         self.camera = Camera2D()
-        self._register_tools()
 
-    def _register_tools(self):
+    def set_map_panel(self, map_panel: MapPanel2D):
         """
-        Registers the available tools with the tool manager.
+        Sets the map panel reference.
         """
-        self.tool_manager.register_tool("draw", DrawTool(self))
-        self.tool_manager.set_active_tool("draw")
+        self.map_panel = map_panel
+
+    def set_tool_manager(self, tool_manager: ToolManager):
+        """
+        Sets the tool manager reference.
+        """
+        self.tool_manager = tool_manager
         
     def init_engine(self):
         """
@@ -78,8 +86,8 @@ class MapEngine2D:
         
         for i in range(6):
             angle = i * 60 * np.pi / 180
-            x = conf.hex_map_engine.hex_radius * np.cos(angle)
-            y = conf.hex_map_engine.hex_radius * np.sin(angle)
+            x = self.config.hex_map_engine.hex_radius * np.cos(angle)
+            y = self.config.hex_map_engine.hex_radius * np.sin(angle)
             filled_vertices.append((x, y))
             outline_vertices.append((x, y))
             
@@ -89,11 +97,11 @@ class MapEngine2D:
         geometry_data = np.array(filled_vertices, dtype=np.float32)
         outline_data = np.array(outline_vertices, dtype=np.float32)
         
-        hex_vbo = sm.add_vbo("hex_filled")
+        hex_vbo = self.shader_manager.add_vbo("hex_filled")
         glBindBuffer(GL_ARRAY_BUFFER, hex_vbo)
         glBufferData(GL_ARRAY_BUFFER, geometry_data.nbytes, geometry_data, GL_STATIC_DRAW)
         
-        outline_vbo = sm.add_vbo("hex_outline")
+        outline_vbo = self.shader_manager.add_vbo("hex_outline")
         glBindBuffer(GL_ARRAY_BUFFER, outline_vbo)
         glBufferData(GL_ARRAY_BUFFER, outline_data.nbytes, outline_data, GL_STATIC_DRAW)
         
@@ -111,8 +119,8 @@ class MapEngine2D:
             0.0, h
             ], dtype=np.float32)
         
-        bg_vao = sm.add_vao("bg_quad")
-        bg_vbo = sm.add_vbo("bg_quad")
+        bg_vao = self.shader_manager.add_vao("bg_quad")
+        bg_vbo = self.shader_manager.add_vbo("bg_quad")
         
         glBindVertexArray(bg_vao)
         glBindBuffer(GL_ARRAY_BUFFER, bg_vbo)
@@ -134,8 +142,8 @@ class MapEngine2D:
             -1.0, 1.0
         ], dtype=np.float32)
 
-        cursor_vao = sm.add_vao("cursor_quad")
-        cursor_vbo = sm.add_vbo("cursor_quad")
+        cursor_vao = self.shader_manager.add_vao("cursor_quad")
+        cursor_vbo = self.shader_manager.add_vbo("cursor_quad")
 
         glBindVertexArray(cursor_vao)
         glBindBuffer(GL_ARRAY_BUFFER, cursor_vbo)
@@ -164,7 +172,7 @@ class MapEngine2D:
             0.0, h
         ], dtype=np.float32)
         
-        glBindBuffer(GL_ARRAY_BUFFER, sm.get_vbo("bg_quad"))
+        glBindBuffer(GL_ARRAY_BUFFER, self.shader_manager.get_vbo("bg_quad"))
         glBufferSubData(GL_ARRAY_BUFFER, 0, background_vertices.nbytes, background_vertices)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         
@@ -175,13 +183,13 @@ class MapEngine2D:
         
         glDisable(GL_DEPTH_TEST)
         
-        pg = sm.get_program("bg_shader")
+        pg = self.shader_manager.get_program("bg_shader")
         glUseProgram(pg)
-        glUniform4f(glGetUniformLocation(pg, "topColor"), *(conf.background.grad_color_0))
-        glUniform4f(glGetUniformLocation(pg, "bottomColor"), *(conf.background.grad_color_1))
+        glUniform4f(glGetUniformLocation(pg, "topColor"), *(self.config.background.grad_color_0))
+        glUniform4f(glGetUniformLocation(pg, "bottomColor"), *(self.config.background.grad_color_1))
         glUniform1f(glGetUniformLocation(pg, "viewportHeight"), float(self.map_panel.height()))
         
-        glBindVertexArray(sm.get_vao("bg_quad"))
+        glBindVertexArray(self.shader_manager.get_vao("bg_quad"))
         glDrawArrays(GL_TRIANGLES, 0, 6)
         glBindVertexArray(0)
         
@@ -196,7 +204,7 @@ class MapEngine2D:
         :type chunk_buffer: dict[str, int]
         """
         
-        pg = sm.get_program("hex_shader")
+        pg = self.shader_manager.get_program("hex_shader")
         glUseProgram(pg)
         
         proj_mat = self._create_projection_matrix()
@@ -209,10 +217,10 @@ class MapEngine2D:
         mode_loc = glGetUniformLocation(pg, "drawMode")
         
         glUniform1i(mode_loc, DrawMode.DRAW_FILLED.value)
-        glUniform4f(color_loc, *(conf.hex_map_custom.default_cell_color))
+        glUniform4f(color_loc, *(self.config.hex_map_custom.default_cell_color))
         
         glBindVertexArray(chunk_buffer["filled_vao"])
-        glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 8, conf.hex_map_engine.chunk_size ** 2)
+        glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 8, self.config.hex_map_engine.chunk_size ** 2)
         
         glBindVertexArray(0)
         glUseProgram(0)
@@ -225,7 +233,7 @@ class MapEngine2D:
         :type chunk_buffer: dict[str, int]
         """
 
-        pg = sm.get_program("hex_shader")
+        pg = self.shader_manager.get_program("hex_shader")
         glUseProgram(pg)
         
         proj_mat = self._create_projection_matrix()
@@ -238,10 +246,10 @@ class MapEngine2D:
         mode_loc = glGetUniformLocation(pg, "drawMode")
         
         glUniform1i(mode_loc, DrawMode.DRAW_OUTLINE.value)
-        glUniform4f(color_loc, *(conf.hex_map_custom.outline_color))
-        glLineWidth(conf.hex_map_custom.outline_width)
+        glUniform4f(color_loc, *(self.config.hex_map_custom.outline_color))
+        glLineWidth(self.config.hex_map_custom.outline_width)
         glBindVertexArray(chunk_buffer["outline_vao"])
-        glDrawArraysInstanced(GL_LINE_LOOP, 0, 6, conf.hex_map_engine.chunk_size ** 2)
+        glDrawArraysInstanced(GL_LINE_LOOP, 0, 6, self.config.hex_map_engine.chunk_size ** 2)
         
         glBindVertexArray(0)
         glUseProgram(0)
@@ -250,7 +258,7 @@ class MapEngine2D:
         """
         Updates dirty chunks and renders all visible chunks.
         """
-        dirty_chunks = self.chunk_manager.get_and_clear_dirty_chunks()
+        dirty_chunks = self.chunk_engine.get_and_clear_dirty_chunks()
         
         for chunk_coord in dirty_chunks:
             logger.debug("Updating chunk instance buffer for dirty chunks...")
@@ -282,7 +290,7 @@ class MapEngine2D:
 
         shape = visual_aid_info.get("shape")
         if shape == "circle":
-            pg = sm.get_program("cursor_shader")
+            pg = self.shader_manager.get_program("cursor_shader")
             glUseProgram(pg)
 
             proj_mat = self._create_projection_matrix()
@@ -291,7 +299,7 @@ class MapEngine2D:
             glUniformMatrix4fv(glGetUniformLocation(pg, "projection"), 1, GL_TRUE, proj_mat)
             glUniformMatrix4fv(glGetUniformLocation(pg, "view"), 1, GL_TRUE, view_mat)
 
-            radius = visual_aid_info.get("radius", 1.0) * conf.hex_map_engine.hex_radius
+            radius = visual_aid_info.get("radius", 1.0) * self.config.hex_map_engine.hex_radius
             color = visual_aid_info.get("color", (1.0, 1.0, 1.0, 1.0))
             
             glUniform2f(glGetUniformLocation(pg, "center_pos"), mouse_world_pos.x(), mouse_world_pos.y())
@@ -299,7 +307,7 @@ class MapEngine2D:
             glUniform4f(glGetUniformLocation(pg, "color"), *color)
             glUniform1f(glGetUniformLocation(pg, "thickness"), 0.05) # TODO: make this configurable
 
-            glBindVertexArray(sm.get_vao("cursor_quad"))
+            glBindVertexArray(self.shader_manager.get_vao("cursor_quad"))
             glDrawArrays(GL_TRIANGLES, 0, 6)
 
             glBindVertexArray(0)
@@ -314,7 +322,7 @@ class MapEngine2D:
         """
         logger.debug(f"Updating chunk instance buffer for chunk {chunk_coord}")
         
-        DATA_DIMENSIONS = conf.hex_map_engine.data_dimensions
+        DATA_DIMENSIONS = self.config.hex_map_engine.data_dimensions
         
         if chunk_coord in self.chunk_buffers:
             buf = self.chunk_buffers[chunk_coord]
@@ -323,7 +331,7 @@ class MapEngine2D:
             glDeleteVertexArrays(1, [filled_vao_id])
             glDeleteVertexArrays(1, [outline_vao_id])
             
-        chunk_data = self.chunk_manager.get_chunk_data(chunk_coord)
+        chunk_data = self.chunk_engine.get_chunk_data(chunk_coord)
         # Ensure the numpy array has the correct float32 dtype for OpenGL
         instance_data = np.array(self._generate_chunk_instance_data(chunk_coord, chunk_data), dtype=np.float32)
         
@@ -331,7 +339,7 @@ class MapEngine2D:
         filled_vao = glGenVertexArrays(1)
         glBindVertexArray(filled_vao)
         
-        glBindBuffer(GL_ARRAY_BUFFER, sm.get_vbo("hex_filled"))
+        glBindBuffer(GL_ARRAY_BUFFER, self.shader_manager.get_vbo("hex_filled"))
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), ctypes.c_void_p(0))
         glEnableVertexAttribArray(0)
         
@@ -353,7 +361,7 @@ class MapEngine2D:
         # Points for the outline to draw (x1, y1), (x2, y2), ...
         outline_vao = glGenVertexArrays(1)
         glBindVertexArray(outline_vao)
-        glBindBuffer(GL_ARRAY_BUFFER, sm.get_vbo("hex_outline"))
+        glBindBuffer(GL_ARRAY_BUFFER, self.shader_manager.get_vbo("hex_outline"))
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), ctypes.c_void_p(0))
         glEnableVertexAttribArray(0)
         
@@ -385,18 +393,18 @@ class MapEngine2D:
         :rtype: list
         """
         
-        CHUNK_SIZE = conf.hex_map_engine.chunk_size
+        chunk_size = self.config.hex_map_engine.chunk_size
         
         instance_data = []
-        chunk_origin_x = chunk_coord[0] * CHUNK_SIZE
-        chunk_origin_y = chunk_coord[1] * CHUNK_SIZE
+        chunk_origin_x = chunk_coord[0] * chunk_size
+        chunk_origin_y = chunk_coord[1] * chunk_size
         
-        for lx in range(CHUNK_SIZE):
-            for ly in range(CHUNK_SIZE):
+        for lx in range(chunk_size):
+            for ly in range(chunk_size):
                 global_x = chunk_origin_x + lx
                 global_y = chunk_origin_y + ly
                 
-                center_x, center_y = get_center_position_from_global_coord((global_x, global_y))
+                center_x, center_y = get_center_position_from_global_coord((global_x, global_y), self.config.hex_map_engine.hex_radius)
                 color = chunk_data[lx, ly]
                 
                 instance_data.extend([center_x, center_y, *color])
@@ -449,14 +457,14 @@ class MapEngine2D:
         :return: A set of (chunk_x, chunk_y) tuples for visible chunks.
         :rtype: set[tuple[int, int]]
         """
-        tl_world = self._screen_to_world((0, 0))
-        br_world = self._screen_to_world((self.map_panel.width(), self.map_panel.height()))
+        tl_world = self.screen_to_world((0, 0))
+        br_world = self.screen_to_world((self.map_panel.width(), self.map_panel.height()))
         
-        min_gx, min_gy = global_pos_to_global_coord(tl_world)
-        max_gx, max_gy = global_pos_to_global_coord(br_world)
+        min_gx, min_gy = global_pos_to_global_coord(tl_world, self.config.hex_map_engine.hex_radius)
+        max_gx, max_gy = global_pos_to_global_coord(br_world, self.config.hex_map_engine.hex_radius)
         
-        min_chunk_x, min_chunk_y, _, _ = global_coord_to_chunk_coord((min_gx, min_gy))
-        max_chunk_x, max_chunk_y, _, _ = global_coord_to_chunk_coord((max_gx, max_gy))
+        min_chunk_x, min_chunk_y, _, _ = global_coord_to_chunk_coord((min_gx, min_gy), self.config.hex_map_engine.chunk_size)
+        max_chunk_x, max_chunk_y, _, _ = global_coord_to_chunk_coord((max_gx, max_gy), self.config.hex_map_engine.chunk_size)
         
         if min_chunk_x > max_chunk_x:
             min_chunk_x, max_chunk_x = max_chunk_x, min_chunk_x
@@ -470,7 +478,7 @@ class MapEngine2D:
         
         return visible
     
-    def _screen_to_world(self, screen_pos: tuple[float, float]):
+    def screen_to_world(self, screen_pos: tuple[float, float]):
         """
         Converts a screen position (pixel coordinates) to a world position.
 
@@ -525,13 +533,13 @@ class MapEngine2D:
         :type zooming_up: bool
         """
         
-        MIN_ZOOM = conf.hex_map_view.min_zoom
-        MAX_ZOOM = conf.hex_map_view.max_zoom
+        min_zoom = self.config.hex_map_view.min_zoom
+        max_zoom = self.config.hex_map_view.max_zoom
         
         if zooming_up:
             self.camera.zoom *= 1.1
         else:
             self.camera.zoom /= 1.1
             
-        self.camera.zoom = max(MIN_ZOOM, min(self.camera.zoom, MAX_ZOOM))
+        self.camera.zoom = max(min_zoom, min(self.camera.zoom, max_zoom))
         self.map_panel.update()

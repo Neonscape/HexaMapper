@@ -1,11 +1,7 @@
-from modules.config import app_config
-from modules.map_helpers import *
+from modules.config import ApplicationConfig
+from modules.map_helpers import global_coord_to_chunk_coord
 from loguru import logger
 import numpy as np
-
-CHUNK_SIZE = app_config.hex_map_engine.chunk_size
-DATA_DIMENSIONS = app_config.hex_map_engine.data_dimensions
-DEFAULT_CELL_COLOR = app_config.hex_map_custom.default_cell_color
 
 class ChunkEngine:
     """
@@ -13,10 +9,11 @@ class ChunkEngine:
     Handles creation, retrieval, and modification of cell data within these chunks,
     and tracks which chunks have been modified ("dirty chunks").
     """
-    def __init__(self):
+    def __init__(self, config: ApplicationConfig):
         """
         Initializes the ChunkEngine.
         """
+        self.config = config
         self.chunks: dict[tuple[int, int], np.ndarray] = {}             # data of all chunks
         self.modified_cells : set[tuple[int, int]] = set()   # only user-modified chunks in here
         self.dirty_chunks : set[tuple[int, int]] = set()                # temporary buffer of modified chunks
@@ -32,7 +29,10 @@ class ChunkEngine:
         :rtype: np.ndarray
         """
         if chunk_coord not in self.chunks:
-            self.chunks[chunk_coord] = np.full((CHUNK_SIZE, CHUNK_SIZE, DATA_DIMENSIONS), DEFAULT_CELL_COLOR, dtype=np.float32)
+            chunk_size = self.config.hex_map_engine.chunk_size
+            data_dims = self.config.hex_map_engine.data_dimensions
+            default_color = self.config.hex_map_custom.default_cell_color
+            self.chunks[chunk_coord] = np.full((chunk_size, chunk_size, data_dims), default_color, dtype=np.float32)
         return self.chunks[chunk_coord]
     
     
@@ -47,7 +47,7 @@ class ChunkEngine:
         :type data: np.ndarray
         """
         logger.debug(f"Setting cell data at {global_coords} to {data}")
-        chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(global_coords)
+        chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(global_coords, self.config.hex_map_engine.chunk_size)
         chunk_data = self._get_or_create_chunk((chunk_x, chunk_y))
         chunk_data[local_x, local_y] = data
         self.dirty_chunks.add((chunk_x, chunk_y))
@@ -63,9 +63,9 @@ class ChunkEngine:
         """
         if global_coords not in self.modified_cells:
             return
-        chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(global_coords)
+        chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(global_coords, self.config.hex_map_engine.chunk_size)
         chunk_data = self._get_or_create_chunk((chunk_x, chunk_y))
-        chunk_data[local_x, local_y] = DEFAULT_CELL_COLOR
+        chunk_data[local_x, local_y] = self.config.hex_map_custom.default_cell_color
         self.dirty_chunks.add((chunk_x, chunk_y))
         self.modified_cells.remove(global_coords)
         
@@ -79,7 +79,7 @@ class ChunkEngine:
         :return: The NumPy array containing the cell data.
         :rtype: np.ndarray
         """
-        chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(global_coords)
+        chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(global_coords, self.config.hex_map_engine.chunk_size)
         chunk_data = self._get_or_create_chunk((chunk_x, chunk_y))
         return chunk_data[local_x, local_y]
         

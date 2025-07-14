@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 from utils.color import RGBAColor as Color
-from modules.config import app_config
 from modules.tools.base_tool import ToolBase
 from PyQt6.QtCore import QEvent
 from modules.commands.paint_cell_command import PaintCellCommand
@@ -49,13 +48,13 @@ class DrawTool(ToolBase):
         :param event: The mouse event.
         :type event: QEvent
         """
-        world_pos = self.map_engine._screen_to_world((event.pos().x(), event.pos().y()))
-        world_coord = global_pos_to_global_coord(world_pos)
+        world_pos = self.map_engine.screen_to_world((event.pos().x(), event.pos().y()))
+        world_coord = global_pos_to_global_coord(world_pos, self.map_engine.config.hex_map_engine.hex_radius)
         
         color = np.array(self.settings.color.to_floats(), dtype=np.float32)
 
         command = PaintCellCommand(
-            chunk_engine=self.map_engine.chunk_manager,
+            chunk_engine=self.map_engine.chunk_engine,
             global_coords=world_coord,
             new_color=color
         )
