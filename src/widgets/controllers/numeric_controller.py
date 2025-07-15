@@ -75,7 +75,8 @@ class NumericController(QWidget):
 
     def _on_edit_change(self) -> None:
         locale = QLocale()
-        ok, v = locale.toDouble(self.line_edit.text())
+        v, ok = locale.toDouble(self.line_edit.text())
+        print(self.line_edit.text(), ok)
         if ok:
             self.setValue(v)
         else:
