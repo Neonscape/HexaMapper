@@ -1,4 +1,4 @@
-from PyQt6.QtGui import QIcon
+from qtpy.QtGui import QIcon
 from pytablericons import TablerIcons, OutlineIcon
 
 class IconManager:

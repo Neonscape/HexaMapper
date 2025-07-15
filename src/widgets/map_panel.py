@@ -1,5 +1,5 @@
-from PyQt6.QtOpenGLWidgets import QOpenGLWidget
-from PyQt6.QtGui import QSurfaceFormat
+from qtpy.QtOpenGLWidgets import QOpenGLWidget
+from qtpy.QtGui import QSurfaceFormat
 from OpenGL.GL import *
 from modules.map_engine import MapEngine2D
 from modules.event_handlers import MapPanel2DEventHandler
@@ -38,7 +38,7 @@ class MapPanel2D(QOpenGLWidget):
         format.setRenderableType(QSurfaceFormat.RenderableType.OpenGL)
         format.setProfile(QSurfaceFormat.OpenGLContextProfile.CompatibilityProfile) 
         format.setVersion(4, 1) 
-        format.setSamples(8) # Enable MSAA
+        format.setSamples(2) # Enable MSAA
         self.setFormat(format)
 
     def initializeGL(self):

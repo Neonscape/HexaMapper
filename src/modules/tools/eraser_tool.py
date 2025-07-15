@@ -1,12 +1,19 @@
 from typing import override
 from modules.map_helpers import global_pos_to_global_coord
-from modules.tools.base_tool import ToolBase
+from modules.tools.base_tool import BaseToolConfig, ToolBase
 from modules.commands.erase_cell_command import EraseCellCommand
-from pydantic import BaseModel
-from PyQt6.QtCore import QEvent
+from pydantic import Field
+from qtpy.QtCore import QEvent
 
-class EraserToolSettings(BaseModel):
-    radius: float = 1.0
+class EraserToolSettings(BaseToolConfig):
+    radius: float = Field(
+        default=1.0,
+        title="半径",
+        json_schema_extra={
+            "ui_min": 1.0,
+            "ui_max": 100.0
+        }
+    )
     
 
 
@@ -39,9 +46,14 @@ class EraserTool(ToolBase):
         self.map_engine.history_manager.finish_action()
         
     
+    @override
     def get_visual_aid_info(self):
         return {
             "shape": "circle",
             "radius": self.settings.radius,
             "color": (1.0, 0.0, 0.0, 0.5) # Red for erase
         }
+
+    @override
+    def get_settings(self):
+        return self.settings

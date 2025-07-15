@@ -1,7 +1,7 @@
 from typing import override
 from modules.map_helpers import global_pos_to_global_coord
 from modules.tools.base_tool import ToolBase
-from PyQt6.QtCore import QEvent
+from qtpy.QtCore import QEvent
 from loguru import logger
 
 from utils.color import RGBAColor
@@ -20,5 +20,9 @@ class DropperTool(ToolBase):
             draw_tool_settings = self.map_engine.tool_manager.get_tool("draw").settings
             draw_tool_settings.color = color
             logger.debug(f"Color set to {color}")
+    
+    @override
+    def get_settings(self):
+        return super().get_settings()
             
         

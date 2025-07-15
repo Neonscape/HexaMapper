@@ -1,18 +1,27 @@
-from pydantic import BaseModel
+from pydantic import Field
 from utils.color import RGBAColor as Color
 from modules.tools.base_tool import ToolBase
-from PyQt6.QtCore import QEvent
+from qtpy.QtCore import QEvent
 from modules.commands.paint_cell_command import PaintCellCommand
 from modules.map_helpers import global_pos_to_global_coord
+from modules.tools.base_tool import BaseToolConfig
 import numpy as np
 from typing import override
 
-class DrawToolSettings(BaseModel):
+class DrawToolSettings(BaseToolConfig):
     """
     Pydantic model for the settings of the DrawTool.
     """
-    radius: float = 1.0
-    color: Color = Color([1.0, 1.0, 1.0, 1.0])
+    radius: float = Field(
+        default=1.0,
+        title="半径",
+        json_schema_extra={
+            "ui_min": 1.0,
+            "ui_max": 100.0
+        }
+    )
+    color: Color = Field(default=Color([1.0, 1.0, 1.0, 1.0]), title="颜色")
+    # TODO: refactor these to use localized strings
 
 class DrawTool(ToolBase):
     """
@@ -85,3 +94,7 @@ class DrawTool(ToolBase):
             "radius": self.settings.radius,
             "color": (1.0, 1.0, 1.0, 0.5)
         }
+
+    @override
+    def get_settings(self):
+        return self.settings

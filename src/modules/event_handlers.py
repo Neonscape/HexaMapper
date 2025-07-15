@@ -1,6 +1,6 @@
 from typing import override, Literal, Optional
-from PyQt6.QtCore import QObject, QEvent, Qt, QPoint
-from PyQt6.QtGui import QMouseEvent, QWheelEvent
+from qtpy.QtCore import QObject, QEvent, Qt, QPoint
+from qtpy.QtGui import QMouseEvent, QWheelEvent
 from loguru import logger
 
 class MapPanel2DEventHandler(QObject):

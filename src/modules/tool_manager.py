@@ -1,4 +1,4 @@
-from PyQt6.QtCore import QEvent
+from qtpy.QtCore import QEvent
 from modules.tools.base_tool import ToolBase
 
 class ToolManager:

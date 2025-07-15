@@ -1,7 +1,7 @@
-from PyQt6.QtWidgets import (
+from qtpy.QtWidgets import (
     QWidget, QMainWindow, QLayout, QHBoxLayout, QMenuBar, QStatusBar
 )
-from PyQt6.QtGui import QAction, QKeySequence
+from qtpy.QtGui import QAction, QKeySequence
 from widgets.map_panel import MapPanel2D
 from widgets.toolbar import CustomToolbar
 from modules.map_engine import MapEngine2D
@@ -47,21 +47,25 @@ class MainAppWindow(QMainWindow):
         self.addToolBar(toolbar)
 
         # Register tools to the toolbar
-        toolbar.register_tool_btn(
+        toolbar.register_tool(
+            tool=self.tool_manager.get_tool("draw"),
             name="draw",
             tooltip="Draw Tool",
             callback=lambda: self.tool_manager.set_active_tool("draw")
         )
-        toolbar.register_tool_btn(
+        toolbar.register_tool(
+            tool=self.tool_manager.get_tool("erase"),
             name="erase",
             tooltip="Eraser Tool",
             callback=lambda: self.tool_manager.set_active_tool("erase")
         )
-        toolbar.register_tool_btn(
+        toolbar.register_tool(
+            tool=self.tool_manager.get_tool("dropper"),
             name="pipe",
             tooltip="Dropper Tool",
             callback=lambda: self.tool_manager.set_active_tool("dropper")
         )
+        toolbar.finalize()
         
         # --- Central Widget ---
         container = QWidget(self)

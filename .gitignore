@@ -15,3 +15,5 @@ __pycache__/
 src/test.py
 build/
 dist/
+app.*
+*.exe

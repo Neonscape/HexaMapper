@@ -4,7 +4,7 @@ Helper functions for converting between different coordinate systems
 for the hexagonal map.
 """
 
-from PyQt6.QtCore import QPointF
+from qtpy.QtCore import QPointF
 from math import sqrt
 
 

@@ -1,10 +1,17 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from abc import abstractmethod, ABC
-from PyQt6.QtCore import QEvent
+from qtpy.QtCore import QEvent
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from modules.map_engine import MapEngine2D
+    
+class BaseToolConfig(BaseModel):
+    """
+    Base configuration model for tools.
+    """
+    ...
 
 class ToolBase(ABC):
     """
@@ -68,3 +75,7 @@ class ToolBase(ABC):
         Called when the tool becomes inactive.
         """
         ...
+    
+    @abstractmethod
+    def get_settings(self):
+        return None

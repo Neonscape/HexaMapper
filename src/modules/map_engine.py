@@ -8,7 +8,7 @@ from modules.history_manager import HistoryManager
 from modules.tool_manager import ToolManager
 from modules.tools.draw_tool import DrawTool
 from OpenGL.GL import *
-from PyQt6.QtCore import QPointF
+from qtpy.QtCore import QPointF
 import numpy as np
 from enum import Enum
 from modules.map_helpers import get_center_position_from_global_coord, global_coord_to_chunk_coord, global_pos_to_global_coord

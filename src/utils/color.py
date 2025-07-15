@@ -61,11 +61,18 @@ class RGBAColor:
             elif all(isinstance(x, (float, int)) for x in value):
                 # Parse from float values (0.0-1.0)
                 if not all(0.0 <= x <= 1.0 for x in value):
-                    raise ValueError("Float color values must be between 0.0 and 1.0")
-                self._r = float(value[0])
-                self._g = float(value[1])
-                self._b = float(value[2])
-                self._a = float(value[3]) if len(value) == 4 else 1.0
+                    if not all(0 <= x <= 255 for x in value):
+                        raise ValueError("Float color values must be between 0.0 and 1.0")
+                    else:
+                        self._r = value[0] / 255.0
+                        self._g = value[1] / 255.0
+                        self._b = value[2] / 255.0
+                        self._a = value[3] / 255.0 if len(value) == 4 else 1.0
+                else:
+                    self._r = float(value[0])
+                    self._g = float(value[1])
+                    self._b = float(value[2])
+                    self._a = float(value[3]) if len(value) == 4 else 1.0
             else:
                 raise TypeError("Color list/tuple must contain either all ints or all floats.")
         else:
