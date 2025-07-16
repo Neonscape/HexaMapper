@@ -1,5 +1,6 @@
 from qtpy.QtOpenGLWidgets import QOpenGLWidget
 from qtpy.QtGui import QSurfaceFormat
+from qtpy.QtCore import QPointF
 from OpenGL.GL import *
 import numpy as np
 from modules.map_engine import MapEngine2D
@@ -100,11 +101,24 @@ class MapPanel2D(QOpenGLWidget):
             # ----------------------------------------------------------------------
             hex_height = hex_radius * np.sqrt(3.0)          # distance between two rows
             hex_width  = 2.0 * hex_radius                     # distance between two columns
+            
+            cells = []
+            
+            min_x_world = None
+            max_x_world = None
+            min_y_world = None
+            max_y_world = None
 
             if not self.engine.chunk_engine.modified_cells:
                 # No edits – export the current viewport
                 tl_world = self.engine.screen_to_world((0, 0))
                 br_world = self.engine.screen_to_world((self.width(), self.height()))
+                
+                min_x_world, min_y_world = tl_world.x(), tl_world.y()
+                max_x_world, max_y_world = br_world.x(), br_world.y()
+                
+                min_x_world, max_x_world = sorted((min_x_world, max_x_world))
+                min_y_world, max_y_world = sorted((min_y_world, max_y_world))
 
                 min_gx, min_gy = global_pos_to_global_coord(tl_world, hex_radius)
                 max_gx, max_gy = global_pos_to_global_coord(br_world, hex_radius)
@@ -113,36 +127,41 @@ class MapPanel2D(QOpenGLWidget):
                 min_gx, max_gx = sorted((min_gx, max_gx))
                 min_gy, max_gy = sorted((min_gy, max_gy))
 
-                cells = [(x, y)
+                _cells = [(x, y)
                          for x in range(min_gx - 1, max_gx + 2)
                          for y in range(min_gy - 1, max_gy + 2)]
+                
+                for cell in _cells:
+                    pos = get_center_position_from_global_coord(cell, hex_radius)
+                    if (min_x_world <= pos[0] <= max_x_world and
+                            min_y_world <= pos[1] <= max_y_world):
+                        cells.append(cell)
+                
             else:
-                # Edited cells – we still add 1-cell padding for safety
-                min_gx = min(c[0] for c in self.engine.chunk_engine.modified_cells) - 1
-                max_gx = max(c[0] for c in self.engine.chunk_engine.modified_cells) + 1
-                min_gy = min(c[1] for c in self.engine.chunk_engine.modified_cells) - 1
-                max_gy = max(c[1] for c in self.engine.chunk_engine.modified_cells) + 1
-
-                cells = [(x, y)
-                         for x in range(min_gx, max_gx + 1)
-                         for y in range(min_gy, max_gy + 1)]
-
-            # ----------------------------------------------------------------------
-            # 2. Build axis-aligned bounding box in WORLD coordinates
-            # ----------------------------------------------------------------------
-            centers_world = [get_center_position_from_global_coord((x, y), hex_radius)
-                             for x, y in cells]
-
-            min_cx = min(c[0] for c in centers_world)
-            max_cx = max(c[0] for c in centers_world)
-            min_cy = min(c[1] for c in centers_world)
-            max_cy = max(c[1] for c in centers_world)
-
-            # Expand by half a hex so outlines are not clipped
-            min_x_world = min_cx - hex_radius
-            max_x_world = max_cx + hex_radius
-            min_y_world = min_cy - hex_height / 2.0
-            max_y_world = max_cy + hex_height / 2.0
+                gpos = [get_center_position_from_global_coord((c[0], c[1]), hex_radius) for c in self.engine.chunk_engine.modified_cells]
+                min_x_world = min(c[0] for c in gpos)
+                max_x_world = max(c[0] for c in gpos)
+                min_y_world = min(c[1] for c in gpos)
+                max_y_world = max(c[1] for c in gpos)
+                
+                min_x_world, max_x_world = sorted((min_x_world, max_x_world))
+                min_y_world, max_y_world = sorted((min_y_world, max_y_world))
+                
+                min_gx, min_gy = global_pos_to_global_coord(QPointF(min_x_world, min_y_world), hex_radius)
+                max_gx, max_gy = global_pos_to_global_coord(QPointF(max_x_world, max_y_world), hex_radius)
+                
+                min_gx, max_gx = sorted((min_gx, max_gx))
+                min_gy, max_gy = sorted((min_gy, max_gy))
+                
+                _cells = [(x, y)
+                         for x in range(min_gx - 1, max_gx + 2)
+                         for y in range(min_gy - 1, max_gy + 2)]
+                
+                for cell in _cells:
+                    pos = get_center_position_from_global_coord(cell, hex_radius)
+                    if (min_x_world <= pos[0] <= max_x_world and
+                            min_y_world <= pos[1] <= max_y_world):
+                        cells.append(cell)
 
             # ----------------------------------------------------------------------
             # 3. Determine final image size
@@ -150,10 +169,7 @@ class MapPanel2D(QOpenGLWidget):
             world_width  = max_x_world - min_x_world
             world_height = max_y_world - min_y_world
 
-            # Choose pixel_per_hex
-            area_width  = max(1, max_gx - min_gx + 1)
-            area_height = max(1, max_gy - min_gy + 1)
-            scale_factor = min(1.0, 100.0 / max(area_width, area_height))
+            scale_factor = min(1.0, 100.0 / max(world_width, world_height))
 
             max_cell_size = 40
             min_cell_size = 15
@@ -190,18 +206,33 @@ class MapPanel2D(QOpenGLWidget):
                     min_y_world, max_y_world, 
                     -1, 1
                 )
-                
-                # Create view matrix to shift the hexagons into the export region
+            
                 view_mat = np.identity(4, dtype=np.float32)
                 
                 chunks_to_render = set()
+                chunk_x_min = float('inf')
+                chunk_x_max = -float('inf')
+                chunk_y_min = float('inf')
+                chunk_y_max = -float('inf')
                 for x, y in cells:
                     chunk_x, chunk_y, _, _ = global_coord_to_chunk_coord(
                         (x, y), self.engine.config.hex_map_engine.chunk_size
                     )
-                    chunks_to_render.add((chunk_x, chunk_y))
-                    if (chunk_x, chunk_y) not in self.engine.chunk_buffers:
-                        self.engine._update_chunk_instance_buffer((chunk_x, chunk_y))
+                    if chunk_x < chunk_x_min: chunk_x_min = chunk_x
+                    if chunk_x > chunk_x_max: chunk_x_max = chunk_x
+                    if chunk_y < chunk_y_min: chunk_y_min = chunk_y
+                    if chunk_y > chunk_y_max: chunk_y_max = chunk_y
+                    
+                chunk_x_min = int(chunk_x_min)
+                chunk_x_max = int(chunk_x_max)
+                chunk_y_min = int(chunk_y_min)
+                chunk_y_max = int(chunk_y_max)
+                
+                for chunk_x in range(chunk_x_min, chunk_x_max + 1):
+                    for chunk_y in range(chunk_y_min, chunk_y_max + 1):
+                        chunks_to_render.add((chunk_x, chunk_y))
+                        if (chunk_x, chunk_y) not in self.engine.chunk_buffers:
+                            self.engine._update_chunk_instance_buffer((chunk_x, chunk_y))
                 
                 # Apply the view matrix to center on export region
                 self.engine.render_scene(proj_mat, view_mat, chunks_to_render)
@@ -231,3 +262,4 @@ class MapPanel2D(QOpenGLWidget):
             [0, 0, -2 / (far - near), -(far + near) / (far - near)],
             [0, 0, 0, 1]
         ], dtype=np.float32)
+        
