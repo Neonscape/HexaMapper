@@ -18,6 +18,17 @@ class ChunkEngine:
         self.modified_cells : set[tuple[int, int]] = set()   # only user-modified chunks in here
         self.dirty_chunks : set[tuple[int, int]] = set()                # temporary buffer of modified chunks
         
+    def reset(self):
+        """
+        Resets the chunk engine to its initial state.
+        """
+        self.chunks.clear()
+        self.dirty_chunks.clear()
+        for cell in self.modified_cells.copy():
+            self.delete_cell_data(cell)
+        self.modified_cells.clear()
+        
+
     def _get_or_create_chunk(self, chunk_coord: tuple[int, int]) -> np.ndarray:
         """
         Retrieves a chunk's data. If the chunk does not exist, it is created and initialized

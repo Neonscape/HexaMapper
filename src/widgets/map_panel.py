@@ -1,8 +1,10 @@
 from qtpy.QtOpenGLWidgets import QOpenGLWidget
 from qtpy.QtGui import QSurfaceFormat
 from OpenGL.GL import *
+import numpy as np
 from modules.map_engine import MapEngine2D
 from modules.event_handlers import MapPanel2DEventHandler
+from modules.map_helpers import global_coord_to_chunk_coord, global_pos_to_global_coord, get_center_position_from_global_coord
 
 
 class MapPanel2D(QOpenGLWidget):
@@ -38,7 +40,7 @@ class MapPanel2D(QOpenGLWidget):
         format.setRenderableType(QSurfaceFormat.RenderableType.OpenGL)
         format.setProfile(QSurfaceFormat.OpenGLContextProfile.CompatibilityProfile) 
         format.setVersion(4, 1) 
-        format.setSamples(2) # Enable MSAA
+        format.setSamples(4) # Enable MSAA
         self.setFormat(format)
 
     def initializeGL(self):
@@ -83,9 +85,149 @@ class MapPanel2D(QOpenGLWidget):
             pos = self.event_handler.last_mouse_pos
             mouse_world_pos = self.engine.screen_to_world((pos.x(), pos.y()))
             self.engine.draw_tool_visual_aid(mouse_world_pos)
-        
-        
-        
-        
 
-        
+    def export_to_image(self):
+        self.makeCurrent()  # Ensure OpenGL context is current
+        try:
+            # Save original viewport
+            original_viewport = glGetIntegerv(GL_VIEWPORT)
+            
+            hex_radius = self.engine.config.hex_map_engine.hex_radius
+            chunk_size = self.engine.config.hex_map_engine.chunk_size
+            
+            # ----------------------------------------------------------------------
+            # 1. Decide which cells have to appear in the image
+            # ----------------------------------------------------------------------
+            hex_height = hex_radius * np.sqrt(3.0)          # distance between two rows
+            hex_width  = 2.0 * hex_radius                     # distance between two columns
+
+            if not self.engine.chunk_engine.modified_cells:
+                # No edits – export the current viewport
+                tl_world = self.engine.screen_to_world((0, 0))
+                br_world = self.engine.screen_to_world((self.width(), self.height()))
+
+                min_gx, min_gy = global_pos_to_global_coord(tl_world, hex_radius)
+                max_gx, max_gy = global_pos_to_global_coord(br_world, hex_radius)
+
+                # Ensure correct ordering
+                min_gx, max_gx = sorted((min_gx, max_gx))
+                min_gy, max_gy = sorted((min_gy, max_gy))
+
+                cells = [(x, y)
+                         for x in range(min_gx - 1, max_gx + 2)
+                         for y in range(min_gy - 1, max_gy + 2)]
+            else:
+                # Edited cells – we still add 1-cell padding for safety
+                min_gx = min(c[0] for c in self.engine.chunk_engine.modified_cells) - 1
+                max_gx = max(c[0] for c in self.engine.chunk_engine.modified_cells) + 1
+                min_gy = min(c[1] for c in self.engine.chunk_engine.modified_cells) - 1
+                max_gy = max(c[1] for c in self.engine.chunk_engine.modified_cells) + 1
+
+                cells = [(x, y)
+                         for x in range(min_gx, max_gx + 1)
+                         for y in range(min_gy, max_gy + 1)]
+
+            # ----------------------------------------------------------------------
+            # 2. Build axis-aligned bounding box in WORLD coordinates
+            # ----------------------------------------------------------------------
+            centers_world = [get_center_position_from_global_coord((x, y), hex_radius)
+                             for x, y in cells]
+
+            min_cx = min(c[0] for c in centers_world)
+            max_cx = max(c[0] for c in centers_world)
+            min_cy = min(c[1] for c in centers_world)
+            max_cy = max(c[1] for c in centers_world)
+
+            # Expand by half a hex so outlines are not clipped
+            min_x_world = min_cx - hex_radius
+            max_x_world = max_cx + hex_radius
+            min_y_world = min_cy - hex_height / 2.0
+            max_y_world = max_cy + hex_height / 2.0
+
+            # ----------------------------------------------------------------------
+            # 3. Determine final image size
+            # ----------------------------------------------------------------------
+            world_width  = max_x_world - min_x_world
+            world_height = max_y_world - min_y_world
+
+            # Choose pixel_per_hex
+            area_width  = max(1, max_gx - min_gx + 1)
+            area_height = max(1, max_gy - min_gy + 1)
+            scale_factor = min(1.0, 100.0 / max(area_width, area_height))
+
+            max_cell_size = 40
+            min_cell_size = 15
+            pixel_per_hex = max(min_cell_size,
+                                min(max_cell_size, int(max_cell_size * scale_factor)))
+
+            pixels_per_world_unit = pixel_per_hex / hex_width
+            width  = max(1, int(world_width  * pixels_per_world_unit))
+            height = max(1, int(world_height * pixels_per_world_unit))
+            
+            fbo = glGenFramebuffers(1)
+            texture = glGenTextures(1)
+            
+            try:
+                glBindFramebuffer(GL_FRAMEBUFFER, fbo)
+                glBindTexture(GL_TEXTURE_2D, texture)
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, None)
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0)
+
+                if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+                    raise RuntimeError("Framebuffer is not complete!")
+
+                glViewport(0, 0, width, height)
+                
+                # Clear to transparent instead of using gradient background
+                glClearColor(0, 0, 0, 0)
+                glClear(GL_COLOR_BUFFER_BIT)
+
+                # Create projection matrix for the export region
+                proj_mat = self._create_ortho_matrix(
+                    min_x_world, max_x_world, 
+                    min_y_world, max_y_world, 
+                    -1, 1
+                )
+                
+                # Create view matrix to shift the hexagons into the export region
+                view_mat = np.identity(4, dtype=np.float32)
+                
+                chunks_to_render = set()
+                for x, y in cells:
+                    chunk_x, chunk_y, _, _ = global_coord_to_chunk_coord(
+                        (x, y), self.engine.config.hex_map_engine.chunk_size
+                    )
+                    chunks_to_render.add((chunk_x, chunk_y))
+                    if (chunk_x, chunk_y) not in self.engine.chunk_buffers:
+                        self.engine._update_chunk_instance_buffer((chunk_x, chunk_y))
+                
+                # Apply the view matrix to center on export region
+                self.engine.render_scene(proj_mat, view_mat, chunks_to_render)
+
+                pixels = glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE)
+            finally:
+                # Clean up resources
+                glBindFramebuffer(GL_FRAMEBUFFER, 0)
+                glDeleteFramebuffers(1, [fbo])
+                glDeleteTextures(1, [texture])
+            
+            # Restore original viewport
+            glViewport(*original_viewport)
+            
+            return pixels, width, height
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise RuntimeError(f"Export failed: {str(e)}")
+        finally:
+            self.doneCurrent()  # Release OpenGL context
+
+    def _create_ortho_matrix(self, left, right, bottom, top, near, far):
+        return np.array([
+            [2 / (right - left), 0, 0, -(right + left) / (right - left)],
+            [0, 2 / (top - bottom), 0, -(top + bottom) / (top - bottom)],
+            [0, 0, -2 / (far - near), -(far + near) / (far - near)],
+            [0, 0, 0, 1]
+        ], dtype=np.float32)

@@ -8,6 +8,7 @@ from modules.tool_manager import ToolManager
 from modules.shader_manager import ShaderManager
 from modules.history_manager import HistoryManager
 from modules.chunk_engine import ChunkEngine
+from modules.file_manager import FileManager
 from modules.config import load_config
 from modules.tools.draw_tool import DrawTool
 from modules.tools.eraser_tool import EraserTool
@@ -39,6 +40,8 @@ def run():
         shader_manager=shader_manager
     )
     
+    file_manager = FileManager(chunk_engine=chunk_engine, map_engine=map_engine)
+    
     # The tool manager needs the map engine to pass to tools
     tool_manager = ToolManager(map_engine=map_engine)
     map_engine.set_tool_manager(tool_manager)
@@ -58,7 +61,8 @@ def run():
     window = MainAppWindow(
         engine=map_engine,
         tool_manager=tool_manager,
-        icon_manager=icon_manager
+        icon_manager=icon_manager,
+        file_manager=file_manager
     )
 
     # --- Final Steps ---

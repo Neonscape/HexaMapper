@@ -15,6 +15,14 @@ class HistoryManager:
         self.redo_stack: List[List[Command]] = []
         self.command_buffer: List[Command] = []
 
+    def clear(self):
+        """
+        Clears the undo and redo stacks.
+        """
+        self.undo_stack.clear()
+        self.redo_stack.clear()
+        self.command_buffer.clear()
+
     def execute(self, command: Command):
         """
         Executes a given command and adds it to the current command buffer.

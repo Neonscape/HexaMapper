@@ -176,10 +176,19 @@ class MapEngine2D:
         glBufferSubData(GL_ARRAY_BUFFER, 0, background_vertices.nbytes, background_vertices)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         
-    def draw_gradient_background(self):
+    def draw_gradient_background(self, width: float = None, height: float = None):
         """
         Draws a gradient background using the background shader.
+        
+        :param width: The width of the background. If None, use the current map panel width.
+        :type width: float, optional
+        :param height: The height of the background. If None, use the current map panel height.
+        :type height: float, optional
         """
+        if width is None:
+            width = self.map_panel.width()
+        if height is None:
+            height = self.map_panel.height()
         
         glDisable(GL_DEPTH_TEST)
         glDepthMask(GL_FALSE)
@@ -189,11 +198,32 @@ class MapEngine2D:
         glUseProgram(pg)
         glUniform4f(glGetUniformLocation(pg, "topColor"), *(self.config.background.grad_color_0))
         glUniform4f(glGetUniformLocation(pg, "bottomColor"), *(self.config.background.grad_color_1))
-        glUniform1f(glGetUniformLocation(pg, "viewportHeight"), float(self.map_panel.height()))
+        glUniform1f(glGetUniformLocation(pg, "viewportHeight"), float(height))
         
-        glBindVertexArray(self.shader_manager.get_vao("bg_quad"))
+        # Create a temporary quad for the background of the given size
+        vertices = np.array([
+            0.0, 0.0,
+            width, 0.0,
+            width, height,
+            0.0, height
+        ], dtype=np.float32)
+        
+        # Create temporary VAO and VBO
+        temp_vao = glGenVertexArrays(1)
+        temp_vbo = glGenBuffers(1)
+        
+        glBindVertexArray(temp_vao)
+        glBindBuffer(GL_ARRAY_BUFFER, temp_vbo)
+        glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+        
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), None)
+        glEnableVertexAttribArray(0)
+        
         glDrawArrays(GL_TRIANGLES, 0, 6)
+        
         glBindVertexArray(0)
+        glDeleteVertexArrays(1, [temp_vao])
+        glDeleteBuffers(1, [temp_vbo])
         
         glUseProgram(0)
         
@@ -201,80 +231,51 @@ class MapEngine2D:
         glEnable(GL_DEPTH_TEST)
         
         
-    def draw_hex_chunk_filled(self, chunk_buffer: dict[str, int]):
+    def render_scene(self, proj_mat, view_mat, chunks_to_render):
         """
-        Draws the filled hexagons for a given chunk.
-
-        :param chunk_buffer: Dictionary containing OpenGL buffer IDs for the chunk.
-        :type chunk_buffer: dict[str, int]
+        Renders a scene with a given projection and view matrix.
         """
-        
         pg = self.shader_manager.get_program("hex_shader")
         glUseProgram(pg)
-        
-        proj_mat = self._create_projection_matrix()
-        view_mat = self._create_view_matrix()
-        
+
         glUniformMatrix4fv(glGetUniformLocation(pg, "projection"), 1, GL_TRUE, proj_mat)
         glUniformMatrix4fv(glGetUniformLocation(pg, "view"), 1, GL_TRUE, view_mat)
-        
-        color_loc = glGetUniformLocation(pg, "color")
-        mode_loc = glGetUniformLocation(pg, "drawMode")
-        
-        glUniform1i(mode_loc, DrawMode.DRAW_FILLED.value)
-        glUniform4f(color_loc, *(self.config.hex_map_custom.default_cell_color))
-        
-        glBindVertexArray(chunk_buffer["filled_vao"])
-        glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 8, self.config.hex_map_engine.chunk_size ** 2)
-        
-        glBindVertexArray(0)
-        glUseProgram(0)
-        
-    def draw_hex_chunk_outline(self, chunk_buffer: dict[str, int]):
-        """
-        Draws the outlines of hexagons for a given chunk.
 
-        :param chunk_buffer: Dictionary containing OpenGL buffer IDs for the chunk.
-        :type chunk_buffer: dict[str, int]
-        """
-
-        pg = self.shader_manager.get_program("hex_shader")
-        glUseProgram(pg)
-        
-        proj_mat = self._create_projection_matrix()
-        view_mat = self._create_view_matrix()
-        
-        glUniformMatrix4fv(glGetUniformLocation(pg, "projection"), 1, GL_TRUE, proj_mat)
-        glUniformMatrix4fv(glGetUniformLocation(pg, "view"), 1, GL_TRUE, view_mat)
-        
-        color_loc = glGetUniformLocation(pg, "color")
-        mode_loc = glGetUniformLocation(pg, "drawMode")
-        
-        glUniform1i(mode_loc, DrawMode.DRAW_OUTLINE.value)
-        glUniform4f(color_loc, *(self.config.hex_map_custom.outline_color))
-        glLineWidth(self.config.hex_map_custom.outline_width)
-        glBindVertexArray(chunk_buffer["outline_vao"])
-        glDrawArraysInstanced(GL_LINE_LOOP, 0, 6, self.config.hex_map_engine.chunk_size ** 2)
-        
-        glBindVertexArray(0)
-        glUseProgram(0)
-    
-    def update_and_render_chunks(self):
-        """
-        Updates dirty chunks and renders all visible chunks.
-        """
-        dirty_chunks = self.chunk_engine.get_and_clear_dirty_chunks()
-        
-        for chunk_coord in dirty_chunks:
-            self._update_chunk_instance_buffer(chunk_coord)
-                
-                
-        visible_chunks = self._get_visible_chunks()
-        for chunk_coord in visible_chunks:
+        for chunk_coord in chunks_to_render:
             if chunk_coord not in self.chunk_buffers:
                 self._update_chunk_instance_buffer(chunk_coord)
-            self.draw_hex_chunk_filled(self.chunk_buffers[chunk_coord])
-            self.draw_hex_chunk_outline(self.chunk_buffers[chunk_coord])
+            
+            chunk_buffer = self.chunk_buffers[chunk_coord]
+
+            # Draw filled hexes
+            glUniform1i(glGetUniformLocation(pg, "drawMode"), DrawMode.DRAW_FILLED.value)
+            glUniform4f(glGetUniformLocation(pg, "color"), *(self.config.hex_map_custom.default_cell_color))
+            glBindVertexArray(chunk_buffer["filled_vao"])
+            glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 8, self.config.hex_map_engine.chunk_size ** 2)
+
+            # Draw outlines
+            glUniform1i(glGetUniformLocation(pg, "drawMode"), DrawMode.DRAW_OUTLINE.value)
+            glUniform4f(glGetUniformLocation(pg, "color"), *(self.config.hex_map_custom.outline_color))
+            glLineWidth(self.config.hex_map_custom.outline_width)
+            glBindVertexArray(chunk_buffer["outline_vao"])
+            glDrawArraysInstanced(GL_LINE_LOOP, 0, 6, self.config.hex_map_engine.chunk_size ** 2)
+
+        glBindVertexArray(0)
+        glUseProgram(0)
+
+    def update_and_render_chunks(self):
+        """
+        Updates dirty chunks and renders all visible chunks to the screen.
+        """
+        dirty_chunks = self.chunk_engine.get_and_clear_dirty_chunks()
+        for chunk_coord in dirty_chunks:
+            self._update_chunk_instance_buffer(chunk_coord)
+        
+        visible_chunks = self._get_visible_chunks()
+        proj_mat = self._create_projection_matrix()
+        view_mat = self._create_view_matrix()
+        
+        self.render_scene(proj_mat, view_mat, visible_chunks)
 
     def draw_tool_visual_aid(self, mouse_world_pos: QPointF):
         """
