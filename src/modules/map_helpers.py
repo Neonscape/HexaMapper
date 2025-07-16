@@ -5,7 +5,34 @@ for the hexagonal map.
 """
 
 from qtpy.QtCore import QPointF
-from math import sqrt
+from math import ceil, sqrt
+from itertools import product
+
+def get_coords_within_radius(pos: QPointF, radius: float, hex_radius: float):
+    """
+    Returns a list of global coordinates within a given radius from a specified position.
+
+    :param pos: The position from which to calculate the coordinates.
+    :type pos: QPointF
+    :param radius: The radius within which to find the coordinates.
+    :type radius: float
+    :return: A list of tuples representing the global coordinates.
+    :rtype: list[tuple[int, int]]
+    """
+    center_coord = global_pos_to_global_coord(pos, hex_radius)
+    unit = ceil(radius / hex_radius)
+    
+    x_pos = [center_coord[0] + i for i in range(-unit, unit + 1)]
+    y_pos = [center_coord[1] + j for j in range(-unit, unit + 1)]
+    
+    prob_coords = [(i, j) for i, j in product(x_pos, y_pos)]
+    ret = []
+    for coord in prob_coords:
+        coord_pos = get_center_position_from_global_coord(coord, hex_radius)
+        if (coord_pos[0] - pos.x()) ** 2 + (coord_pos[1] - pos.y()) ** 2 <= radius ** 2:
+            ret.append(coord)
+            
+    return ret
 
 
 def get_center_position_from_global_coord(global_coord: tuple[int, int], hex_radius: float) -> tuple[float, float]:
@@ -23,7 +50,7 @@ def get_center_position_from_global_coord(global_coord: tuple[int, int], hex_rad
     col, row = global_coord
     # odd-q vertical layout
     x = hex_radius * 3 / 2 * col
-    y = hex_radius * sqrt(3) * (row + 0.5 * (col % 2))
+    y = hex_radius * sqrt(3) * (row + 0.5 * col)
     return (x, y)
 
 
@@ -60,7 +87,7 @@ def global_pos_to_global_coord(global_pos: QPointF, hex_radius: float) -> tuple[
     col_approx = global_pos.x() / (1.5 * hex_radius)
     
     # Use proper vertical scaling factor (sqrt(3) * hex_radius)
-    row_approx = global_pos.y() / (sqrt(3) * hex_radius)
+    row_approx = global_pos.y() / (sqrt(3) * hex_radius) - global_pos.x() / 3
     
     col = round(col_approx)
     row = round(row_approx)

@@ -1,5 +1,5 @@
 import sys
-from PyQt6.QtWidgets import QApplication
+from qtpy.QtWidgets import QApplication
 from modules.tools.dropper_tool import DropperTool
 from widgets.main_window import MainAppWindow
 from modules.map_engine import MapEngine2D

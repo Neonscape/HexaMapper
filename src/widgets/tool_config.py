@@ -2,6 +2,7 @@ from modules.tools.base_tool import BaseToolConfig, ToolBase
 from qtpy.QtWidgets import QWidget, QHBoxLayout, QLayout, QSizePolicy
 from qtpy.QtCore import Qt
 from widgets.controllers.color_controller import ColorController
+from widgets.controllers.controller_base import BaseController
 from widgets.controllers.numeric_controller import NumericController
 
 from utils.color import RGBAColor
@@ -18,7 +19,7 @@ class ToolConfigWidget(QWidget):
             return
         cls = tool.get_settings().__class__
         
-        self.controllers: dict[str, QWidget] = {}
+        self.controllers: dict[str, BaseController] = {}
         self.layout: QLayout = QHBoxLayout(self)
         self.layout.setDirection(QHBoxLayout.Direction.LeftToRight)
         self.layout.setSpacing(1)
@@ -52,3 +53,7 @@ class ToolConfigWidget(QWidget):
                 )
                 self.controllers[field_name] = controller
                 self.layout.addWidget(controller)
+    
+    def update(self):
+        for controller in self.controllers.values():
+            controller.update()

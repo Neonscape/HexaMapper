@@ -1,9 +1,12 @@
+from typing import override
 from qtpy.QtCore import Qt, Signal, QLocale
 from qtpy.QtWidgets import QWidget, QHBoxLayout, QLabel, QSlider, QLineEdit, QSizePolicy
 from pydantic import BaseModel, Field
 
+from widgets.controllers.controller_base import BaseController
 
-class NumericController(QWidget):
+
+class NumericController(BaseController):
     def __init__(
         self,
         label_text: str,
@@ -76,7 +79,6 @@ class NumericController(QWidget):
     def _on_edit_change(self) -> None:
         locale = QLocale()
         v, ok = locale.toDouble(self.line_edit.text())
-        print(self.line_edit.text(), ok)
         if ok:
             self.setValue(v)
         else:
@@ -98,3 +100,7 @@ class NumericController(QWidget):
             return
 
         setattr(self._model, self._model_field, self.value())
+        
+    @override
+    def update(self):
+        return super().update()

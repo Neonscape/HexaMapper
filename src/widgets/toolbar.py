@@ -65,6 +65,7 @@ class CustomToolbar(QToolBar):
             clicked_tool_config = self.tool_configs[button]
             clicked_tool_config.setVisible(True)
             self._current_active_tool_config = clicked_tool_config # Update the active config
+            clicked_tool_config.update()
 
         # Call the original callback associated with the button
         callback = self._button_callbacks.get(button)

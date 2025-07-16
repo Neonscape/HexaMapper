@@ -5,6 +5,7 @@ from qtpy.QtCore import QEvent
 from modules.commands.paint_cell_command import PaintCellCommand
 from modules.map_helpers import global_pos_to_global_coord
 from modules.tools.base_tool import BaseToolConfig
+from modules.map_helpers import get_coords_within_radius
 import numpy as np
 from typing import override
 
@@ -61,10 +62,12 @@ class DrawTool(ToolBase):
         world_coord = global_pos_to_global_coord(world_pos, self.map_engine.config.hex_map_engine.hex_radius)
         
         color = np.array(self.settings.color.to_floats(), dtype=np.float32)
+        
+        covered_coords = get_coords_within_radius(world_pos, self.settings.radius, self.map_engine.config.hex_map_engine.hex_radius)
 
         command = PaintCellCommand(
             chunk_engine=self.map_engine.chunk_engine,
-            global_coords=world_coord,
+            global_coords=covered_coords,
             new_color=color
         )
         self.map_engine.history_manager.execute(command)

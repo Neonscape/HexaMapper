@@ -1,10 +1,12 @@
+from typing import override
 from vcolorpicker import getColor
 from qtpy.QtWidgets import QWidget, QPushButton, QLayout, QHBoxLayout, QLabel, QSizePolicy
 from qtpy.QtGui import QPalette, QColor
 from pydantic import BaseModel, Field
 from utils.color import RGBAColor
+from widgets.controllers.controller_base import BaseController
 
-class ColorController(QWidget):
+class ColorController(BaseController):
     def __init__(self, label: str = "", model: BaseModel = None, model_field: str = "", parent = None):
         super().__init__(parent=parent)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
@@ -35,6 +37,9 @@ class ColorController(QWidget):
         self.set_btn_color(self.color)
         setattr(self._model, self._field, self.color)
         
-        
+    @override
+    def update(self):
+        self.color = getattr(self._model, self._field)
+        self.set_btn_color(self.color)
         
         

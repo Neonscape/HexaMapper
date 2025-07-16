@@ -1,5 +1,5 @@
 from typing import override
-from modules.map_helpers import global_pos_to_global_coord
+from modules.map_helpers import get_coords_within_radius, global_pos_to_global_coord
 from modules.tools.base_tool import BaseToolConfig, ToolBase
 from modules.commands.erase_cell_command import EraseCellCommand
 from pydantic import Field
@@ -33,9 +33,12 @@ class EraserTool(ToolBase):
     def mouse_move(self, event: QEvent):
         world_pos = self.map_engine.screen_to_world((event.pos().x(), event.pos().y()))
         world_coord = global_pos_to_global_coord(world_pos, self.map_engine.config.hex_map_engine.hex_radius)
+        
+        covered_coords = get_coords_within_radius(world_pos, self.settings.radius, self.map_engine.config.hex_map_engine.hex_radius)
+        
         command = EraseCellCommand(
             self.map_engine.chunk_engine,
-            global_coords=world_coord
+            global_coords=covered_coords
         )
         
         self.map_engine.history_manager.execute(command)
