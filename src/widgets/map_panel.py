@@ -138,24 +138,33 @@ class MapPanel2D(QOpenGLWidget):
                         cells.append(cell)
                 
             else:
-                gpos = [get_center_position_from_global_coord((c[0], c[1]), hex_radius) for c in self.engine.chunk_engine.modified_cells]
+                # 1. Build the axis–aligned rectangle that contains every modified cell
+                gpos = [get_center_position_from_global_coord(c, hex_radius)
+                        for c in self.engine.chunk_engine.modified_cells]
                 min_x_world = min(c[0] for c in gpos)
                 max_x_world = max(c[0] for c in gpos)
                 min_y_world = min(c[1] for c in gpos)
                 max_y_world = max(c[1] for c in gpos)
-                
-                min_x_world, max_x_world = sorted((min_x_world, max_x_world))
-                min_y_world, max_y_world = sorted((min_y_world, max_y_world))
-                
-                min_gx, min_gy = global_pos_to_global_coord(QPointF(min_x_world, min_y_world), hex_radius)
-                max_gx, max_gy = global_pos_to_global_coord(QPointF(max_x_world, max_y_world), hex_radius)
-                
-                min_gx, max_gx = sorted((min_gx, max_gx))
-                min_gy, max_gy = sorted((min_gy, max_gy))
-                
+
+                # 2. Convert the four corners of that rectangle to hex coordinates
+                corners = [
+                    QPointF(min_x_world, min_y_world),
+                    QPointF(min_x_world, max_y_world),
+                    QPointF(max_x_world, min_y_world),
+                    QPointF(max_x_world, max_y_world),
+                ]
+                hex_coords = [global_pos_to_global_coord(p, hex_radius) for p in corners]
+
+                # 3. Bounding rhombus in hex space (offset coordinates here)
+                min_hx = min(h[0] for h in hex_coords) - 1
+                max_hx = max(h[0] for h in hex_coords) + 1
+                min_hy = min(h[1] for h in hex_coords) - 1
+                max_hy = max(h[1] for h in hex_coords) + 1
+
+                # 4. Every hex cell inside that rhombus
                 _cells = [(x, y)
-                         for x in range(min_gx - 1, max_gx + 2)
-                         for y in range(min_gy - 1, max_gy + 2)]
+                         for x in range(min_hx, max_hx + 1)
+                         for y in range(min_hy, max_hy + 1)]
                 
                 for cell in _cells:
                     pos = get_center_position_from_global_coord(cell, hex_radius)
