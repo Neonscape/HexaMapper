@@ -9,7 +9,6 @@ __pycache__/
 *.egg-info
 *.egg
 *.manifest
-*.spec
 *.dist-info
 .vscode/
 src/test.py

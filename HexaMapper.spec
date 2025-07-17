@@ -2,7 +2,7 @@
 
 # Analysis object (defines what files/modules to analyze)
 a = Analysis(
-    ['src\\app.py'],
+    ['src/app.py'],
     pathex=[],
     binaries=[],
     datas=[
