@@ -5,10 +5,13 @@ on:
     branches:
       - master # Trigger on pushes to the main branch for regular builds
     tags:
-      - 'v*' # Trigger only on tags like v1.0, v1.0.1, etc., for releases
+      - "v*" # Trigger only on tags like v1.0, v1.0.1, etc., for releases
   pull_request:
     branches:
-      - main # Trigger on pull requests to the main branch for regular builds
+      - master # Trigger on pull requests to the main branch for regular builds
+
+env:
+  APP_NAME: HexaMapper
 
 jobs:
   build-windows:
@@ -22,7 +25,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12' # Or specify your exact Python version, e.g., '3.9'
+          python-version: "3.12" # Or specify your exact Python version, e.g., '3.9'
 
       - name: Create and activate virtual environment
         run: python -m venv .venv && .venv\Scripts\activate
@@ -34,7 +37,7 @@ jobs:
         run: pip install pyinstaller && choco install upx --no-progress
 
       - name: Build Windows application
-        run: pyinstaller HexaMapper.spec # Replace your_script.spec with your actual .spec file name
+        run: pyinstaller {{env.APP_NAME}}.spec # Replace your_script.spec with your actual .spec file name
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
@@ -66,7 +69,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12' # Or specify your exact Python version, e.g., '3.9'
+          python-version: "3.12" # Or specify your exact Python version, e.g., '3.9'
 
       - name: Create and activate virtual environment
         run: python -m venv .venv && source .venv/bin/activate
@@ -78,7 +81,7 @@ jobs:
         run: pip install pyinstaller && sudo apt-get update && sudo apt-get install -y upx-ucl
 
       - name: Build Linux application
-        run: pyinstaller HexaMapper.spec # Replace your_script.spec with your actual .spec file name
+        run: pyinstaller {{env.APP_NAME}}.spec # Replace your_script.spec with your actual .spec file name
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
