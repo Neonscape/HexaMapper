@@ -3,7 +3,7 @@ name: Build and Release
 on:
   push:
     branches:
-      - main # Trigger on pushes to the main branch for regular builds
+      - master # Trigger on pushes to the main branch for regular builds
     tags:
       - 'v*' # Trigger only on tags like v1.0, v1.0.1, etc., for releases
   pull_request:
