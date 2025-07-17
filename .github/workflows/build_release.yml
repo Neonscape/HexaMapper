@@ -81,7 +81,7 @@ jobs:
         run: pip install pyinstaller && sudo apt-get update && sudo apt-get install -y upx-ucl
 
       - name: Build Linux application
-        run: pyinstaller {{env.APP_NAME}}.spec # Replace your_script.spec with your actual .spec file name
+        run: pyinstaller ${{ env.APP_NAME }}.spec # Replace your_script.spec with your actual .spec file name
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
