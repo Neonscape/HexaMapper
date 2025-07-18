@@ -22,10 +22,10 @@ class ChunkEngine:
         """
         Resets the chunk engine to its initial state.
         """
-        self.chunks.clear()
-        self.dirty_chunks.clear()
         for cell in self.modified_cells.copy():
             self.delete_cell_data(cell)
+        self.chunks.clear()
+        self.dirty_chunks.clear()
         self.modified_cells.clear()
         
 
