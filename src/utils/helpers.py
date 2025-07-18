@@ -33,10 +33,14 @@ def load_program(vertex_file_path: str, fragment_file_path: str) -> int | None:
     :rtype: int | None
     """
     
-    v_file, f_file = load_file(vertex_file_path), load_file(fragment_file_path)
+    v_file = load_file(vertex_file_path)
+    if v_file is None:
+        logger.error(f"Error loading vertex shader {vertex_file_path}, returning None")
+        return None
 
-    if v_file is None or f_file is None:
-        logger.error("Error loading shaders, returning None")
+    f_file = load_file(fragment_file_path)
+    if f_file is None:
+        logger.error(f"Error loading fragment shader {fragment_file_path}, returning None")
         return None
 
     try:

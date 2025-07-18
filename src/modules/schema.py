@@ -57,6 +57,8 @@ class ApplicationConfig(BaseModel):
     """
     The main application configuration schema, combining all sub-configurations.
     """
+    app_name: str = "HexaMapper"
+    version: str = "1.0.0"
     background: BackgroundConfig = BackgroundConfig()
     hex_map_engine: HexMapEngineConfig = HexMapEngineConfig()
     hex_map_custom: HexMapCustomConfig = HexMapCustomConfig()
