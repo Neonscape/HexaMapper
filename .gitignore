@@ -16,3 +16,5 @@ build/
 dist/
 app.*
 *.exe
+.pytest_cache/
+.env

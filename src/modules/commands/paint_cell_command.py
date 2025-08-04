@@ -1,5 +1,5 @@
 from modules.commands.base_command import Command
-from modules.chunk_engine import ChunkEngine
+from modules.chunk_engine import ChunkEngine, ChunkLayer
 import numpy as np
 
 
@@ -23,7 +23,7 @@ class PaintCellCommand(Command):
         self.global_coords = global_coords
         self.new_color = new_color
         self.previous_color = {coord: self.chunk_engine.get_cell_data(coord).copy() for coord in global_coords}
-        self.is_new = {coord: (coord not in self.chunk_engine.modified_cells) for coord in global_coords}
+        self.is_new = {coord: (coord not in self.chunk_engine.get_modified_cells()) for coord in global_coords}
 
     def execute(self):
         """

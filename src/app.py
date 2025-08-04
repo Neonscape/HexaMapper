@@ -7,7 +7,7 @@ from modules.icon_manager import IconManager
 from modules.tool_manager import ToolManager
 from modules.shader_manager import ShaderManager
 from modules.history_manager import HistoryManager
-from modules.chunk_engine import ChunkEngine
+from modules.chunk_engine import ChunkLayer, ChunkEngine
 from modules.file_manager import FileManager
 from modules.config import load_config
 from modules.tools.draw_tool import DrawTool

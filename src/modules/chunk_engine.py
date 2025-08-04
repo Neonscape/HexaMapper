@@ -4,15 +4,60 @@ from loguru import logger
 import numpy as np
 
 class ChunkEngine:
+    def __init__(self, config: ApplicationConfig):
+        self.config = config
+        self.layers: list[ChunkLayer] = [ChunkLayer(config)]
+        self.current_layer: int = 0
+        
+    def reset(self):
+        """
+        Resets the chunk engine to its initial state.
+        """
+        for layer in self.layers:
+            layer.reset()
+    
+    def set_cell_data(self, global_coord: tuple[int, int], data: np.ndarray):
+        layer = self.layers[self.current_layer]
+        layer.set_cell_data(global_coords=global_coord, data=data)
+        
+    def delete_cell_data(self, global_coord: tuple[int, int]):
+        layer = self.layers[self.current_layer]
+        layer.delete_cell_data(global_coords=global_coord)
+        
+    def get_cell_data(self, global_coord: tuple[int, int]) -> np.ndarray:
+        layer = self.layers[self.current_layer]
+        return layer.get_cell_data(global_coords=global_coord)
+    
+    def get_chunk_data(self, chunk_coord: tuple[int, int]) -> np.ndarray:
+        chunks = [l.get_chunk_data(chunk_coord) for l in self.layers]
+        final_chunk = chunks[0].copy()
+        for layer in chunks[1:]:
+            mask = layer != self.config.hex_map_custom.default_cell_color
+            final_chunk[mask] = layer[mask]
+        
+        return final_chunk
+    
+    def get_modified_cells(self):
+        return self.layers[self.current_layer].modified_cells
+    
+    def get_and_clear_dirty_chunks(self):
+        dirty = list(self.layers[self.current_layer].dirty_chunks)
+        self.layers[self.current_layer].dirty_chunks.clear()
+        return dirty
+            
+
+class ChunkLayer:
     """
     Manages the hex map data by organizing it into chunks.
     Handles creation, retrieval, and modification of cell data within these chunks,
     and tracks which chunks have been modified ("dirty chunks").
     """
-    def __init__(self, config: ApplicationConfig):
+    def __init__(self, config: ApplicationConfig, desc: str = "Layer 0"):
         """
         Initializes the ChunkEngine.
         """
+        self.desc: str = desc
+        self.is_visible: bool = True
         self.config = config
         self.chunks: dict[tuple[int, int], np.ndarray] = {}             # data of all chunks
         self.modified_cells : set[tuple[int, int]] = set()   # only user-modified chunks in here

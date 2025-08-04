@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from modules.chunk_engine import ChunkEngine
+from modules.chunk_engine import ChunkLayer
 import struct
 from loguru import logger
 from PIL import Image, ImageDraw
@@ -19,7 +19,7 @@ class FileManager:
     MAGIC_NUMBER = b"HMAP"
     VERSION = 1
 
-    def __init__(self, chunk_engine: ChunkEngine, map_engine: MapEngine2D):
+    def __init__(self, chunk_engine: ChunkLayer, map_engine: MapEngine2D):
         """
         Initializes the FileManager.
 

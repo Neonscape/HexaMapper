@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from utils.color import RGBAColor
 from modules.shader_manager import ShaderManager
 from modules.config import ApplicationConfig
-from modules.chunk_engine import ChunkEngine
+from modules.chunk_engine import ChunkLayer, ChunkEngine
 from modules.history_manager import HistoryManager
 from modules.tool_manager import ToolManager
 from modules.tools.draw_tool import DrawTool
@@ -328,6 +328,7 @@ class MapEngine2D:
         DATA_DIMENSIONS = self.config.hex_map_engine.data_dimensions
         
         if chunk_coord in self.chunk_buffers:
+            print(chunk_coord)
             buf = self.chunk_buffers[chunk_coord]
             instance_vbo_id, filled_vao_id, outline_vao_id = buf["instance_vbo"], buf["filled_vao"], buf["outline_vao"]
             glDeleteBuffers(1, [instance_vbo_id])

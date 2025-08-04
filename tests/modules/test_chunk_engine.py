@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from unittest.mock import patch, MagicMock
-from modules.chunk_engine import ChunkEngine
+from modules.chunk_engine import ChunkLayer
 from modules.config import ApplicationConfig
 from modules.schema import HexMapEngineConfig, HexMapCustomConfig, BackgroundConfig, HexMapShaderConfig, HexMapViewConfig
 
@@ -38,7 +38,7 @@ def mock_global_coord_to_chunk_coord():
 # Test cases for ChunkEngine
 def test_chunk_engine_initialization(mock_app_config):
     """Test that ChunkEngine initializes correctly."""
-    engine = ChunkEngine(mock_app_config)
+    engine = ChunkLayer(mock_app_config)
     assert isinstance(engine.chunks, dict)
     assert len(engine.chunks) == 0
     assert isinstance(engine.dirty_chunks, set)
@@ -48,7 +48,7 @@ def test_chunk_engine_initialization(mock_app_config):
 
 def test_get_or_create_chunk_new(mock_app_config):
     """Test creating a new chunk."""
-    engine = ChunkEngine(mock_app_config)
+    engine = ChunkLayer(mock_app_config)
     chunk_coord = (0, 0)
     chunk_data = engine._get_or_create_chunk(chunk_coord)
 
@@ -62,7 +62,7 @@ def test_get_or_create_chunk_new(mock_app_config):
 
 def test_get_or_create_chunk_existing(mock_app_config):
     """Test retrieving an existing chunk."""
-    engine = ChunkEngine(mock_app_config)
+    engine = ChunkLayer(mock_app_config)
     chunk_coord = (0, 0)
     # Create it first
     engine._get_or_create_chunk(chunk_coord)
@@ -82,7 +82,7 @@ def test_get_or_create_chunk_existing(mock_app_config):
 def test_set_cell_data(mock_app_config, mock_global_coord_to_chunk_coord,
                        global_coords, expected_chunk_coord, expected_local_coord):
     """Test setting cell data and marking chunk as dirty."""
-    engine = ChunkEngine(mock_app_config)
+    engine = ChunkLayer(mock_app_config)
     test_data = np.array([1.0, 0.0, 0.0, 1.0], dtype=np.float32) # Red color
 
     engine.set_cell_data(global_coords, test_data)
@@ -99,7 +99,7 @@ def test_set_cell_data(mock_app_config, mock_global_coord_to_chunk_coord,
 
 def test_get_cell_data(mock_app_config, mock_global_coord_to_chunk_coord):
     """Test retrieving cell data."""
-    engine = ChunkEngine(mock_app_config)
+    engine = ChunkLayer(mock_app_config)
     global_coords = (5, 5)
     test_data = np.array([0.0, 1.0, 0.0, 1.0], dtype=np.float32) # Green color
 
@@ -117,7 +117,7 @@ def test_get_cell_data(mock_app_config, mock_global_coord_to_chunk_coord):
 
 def test_delete_cell_data(mock_app_config, mock_global_coord_to_chunk_coord):
     """Test deleting cell data."""
-    engine = ChunkEngine(mock_app_config)
+    engine = ChunkLayer(mock_app_config)
     global_coords = (7, 7)
     test_data = np.array([0.0, 0.0, 1.0, 1.0], dtype=np.float32) # Blue color
 
@@ -153,7 +153,7 @@ def test_delete_cell_data(mock_app_config, mock_global_coord_to_chunk_coord):
 
 def test_get_chunk_data(mock_app_config):
     """Test retrieving chunk data."""
-    engine = ChunkEngine(mock_app_config)
+    engine = ChunkLayer(mock_app_config)
     chunk_coord = (0, 0)
     chunk_data = engine.get_chunk_data(chunk_coord)
 
@@ -166,7 +166,7 @@ def test_get_chunk_data(mock_app_config):
 
 def test_get_and_clear_dirty_chunks(mock_app_config, mock_global_coord_to_chunk_coord):
     """Test getting and clearing dirty chunks."""
-    engine = ChunkEngine(mock_app_config)
+    engine = ChunkLayer(mock_app_config)
     engine.set_cell_data((0, 0), np.array([1,0,0,1], dtype=np.float32))
     engine.set_cell_data((17, 17), np.array([0,1,0,1], dtype=np.float32)) # In chunk (1,1)
 
@@ -182,7 +182,7 @@ def test_get_and_clear_dirty_chunks(mock_app_config, mock_global_coord_to_chunk_
 
 def test_reset(mock_app_config, mock_global_coord_to_chunk_coord):
     """Test resetting the chunk engine."""
-    engine = ChunkEngine(mock_app_config)
+    engine = ChunkLayer(mock_app_config)
     engine.set_cell_data((0, 0), np.array([1,0,0,1], dtype=np.float32))
     engine.set_cell_data((17, 17), np.array([0,1,0,1], dtype=np.float32))
 

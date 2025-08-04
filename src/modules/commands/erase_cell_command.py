@@ -1,4 +1,4 @@
-from modules.chunk_engine import ChunkEngine
+from modules.chunk_engine import ChunkEngine, ChunkLayer
 from modules.commands.base_command import Command
 
 class EraseCellCommand(Command):
@@ -6,7 +6,7 @@ class EraseCellCommand(Command):
         self.chunk_engine = chunk_engine
         self.global_coords = global_coords
         self.previous_color = {coord: self.chunk_engine.get_cell_data(coord).copy() for coord in global_coords}
-        self.is_new = {coord: (coord not in self.chunk_engine.modified_cells) for coord in global_coords}
+        self.is_new = {coord: (coord not in self.chunk_engine.get_modified_cells()) for coord in global_coords}
         
     def execute(self):
         for coord in self.global_coords:
