@@ -2,19 +2,23 @@ from modules.config import ApplicationConfig
 from modules.map_helpers import global_coord_to_chunk_coord
 from loguru import logger
 import numpy as np
+from qtpy.QtCore import QObject, Signal
 
-class ChunkEngine:
+class ChunkEngine(QObject):
+    layers_reordered = Signal()
+    
     def __init__(self, config: ApplicationConfig):
+        super().__init__()
         self.config = config
         self.layers: list[ChunkLayer] = [ChunkLayer(config)]
         self.current_layer: int = 0
+        self.name_cnt: int = 1
         
     def reset(self):
         """
         Resets the chunk engine to its initial state.
         """
-        for layer in self.layers:
-            layer.reset()
+        self.layers.clear()
     
     def set_cell_data(self, global_coord: tuple[int, int], data: np.ndarray):
         layer = self.layers[self.current_layer]
@@ -28,8 +32,11 @@ class ChunkEngine:
         layer = self.layers[self.current_layer]
         return layer.get_cell_data(global_coords=global_coord)
     
+    def get_layer_cell_data(self, layer: int, global_coord: tuple[int, int]) -> np.ndarray:
+        return self.layers[layer].get_cell_data(global_coords=global_coord)
+    
     def get_chunk_data(self, chunk_coord: tuple[int, int]) -> np.ndarray:
-        chunks = [l.get_chunk_data(chunk_coord) for l in self.layers]
+        chunks = [l.get_chunk_data(chunk_coord) for l in self.layers if l.is_visible]
         final_chunk = chunks[0].copy()
         for layer in chunks[1:]:
             mask = layer != self.config.hex_map_custom.default_cell_color
@@ -40,10 +47,49 @@ class ChunkEngine:
     def get_modified_cells(self):
         return self.layers[self.current_layer].modified_cells
     
+    def get_all_modified_cells(self):
+        return dict([(idx, self.layers[idx].modified_cells) for idx in range(len(self.layers))])
+    
     def get_and_clear_dirty_chunks(self):
         dirty = list(self.layers[self.current_layer].dirty_chunks)
         self.layers[self.current_layer].dirty_chunks.clear()
         return dirty
+
+    def insert_layer(self, desc:str = None, idx: int = None):
+        if desc is None:
+            desc = f"Layer {self.name_cnt}"
+            self.name_cnt += 1
+        if idx is None:
+            idx = self.current_layer + 1
+        self.layers.insert(idx, ChunkLayer(self.config, desc))
+        self.current_layer = idx
+    
+    def delete_active_layer(self):
+        del self.layers[self.current_layer]
+        if len(self.layers) == 0:
+            self.insert_layer()
+        self.current_layer = max(0, self.current_layer - 1)
+    
+    def reorder_layer(self, from_idx: int, to_idx: int):
+        logger.debug(f"Reordering layer from {from_idx} to {to_idx}")
+        if from_idx < 0 or from_idx >= len(self.layers) or to_idx < 0 or to_idx >= len(self.layers):
+            logger.error("Invalid layer index")
+            return
+        if from_idx == to_idx:
+            return
+        
+        self.layers.insert(to_idx, self.layers.pop(from_idx))
+        
+        if self.current_layer == from_idx:
+            self.current_layer = to_idx
+        elif from_idx < self.current_layer and to_idx > self.current_layer:
+            self.current_layer -= 1
+        elif from_idx > self.current_layer and to_idx < self.current_layer:
+            self.current_layer += 1
+            
+        
+        self.layers_reordered.emit()
+
             
 
 class ChunkLayer:

@@ -10,7 +10,13 @@ class IconManager:
             "save": OutlineIcon.DEVICE_FLOPPY,
             "draw": OutlineIcon.BRUSH,
             "erase": OutlineIcon.ERASER,
-            "pipe": OutlineIcon.TEST_PIPE
+            "pipe": OutlineIcon.TEST_PIPE,
+            "visible": OutlineIcon.EYE,
+            "invisible": OutlineIcon.EYE_CLOSED,
+            "plus": OutlineIcon.PLUS,
+            "minus": OutlineIcon.MINUS,
+            "up": OutlineIcon.CARET_UP,
+            "down": OutlineIcon.CARET_DOWN,
             # add more icons here
         }
         self._init_icons()

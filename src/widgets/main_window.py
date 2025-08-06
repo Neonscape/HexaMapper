@@ -2,7 +2,9 @@ from qtpy.QtWidgets import (
     QWidget, QMainWindow, QLayout, QHBoxLayout, QMenuBar, QStatusBar, QMessageBox, QFileDialog
 )
 from qtpy.QtGui import QAction, QKeySequence
+from modules.chunk_engine import ChunkEngine
 from modules.file_manager import FileManager
+from widgets.layer_panel import LayerPanel
 from widgets.map_panel import MapPanel2D
 from widgets.toolbar import CustomToolbar
 from modules.map_engine import MapEngine2D
@@ -10,9 +12,10 @@ from modules.tool_manager import ToolManager
 from modules.icon_manager import IconManager
 
 class MainAppWindow(QMainWindow):
-    def __init__(self, engine: MapEngine2D, tool_manager: ToolManager, icon_manager: IconManager, file_manager: FileManager, title: str ="HexaMapper", size: tuple[int, int] = (1200, 800)):
+    def __init__(self, chunk_engine: ChunkEngine, map_engine: MapEngine2D, tool_manager: ToolManager, icon_manager: IconManager, file_manager: FileManager, title: str ="HexaMapper", size: tuple[int, int] = (1200, 800)):
         super().__init__()
-        self.engine = engine
+        self.chunk_engine = chunk_engine
+        self.map_engine = map_engine
         self.tool_manager = tool_manager
         self.icon_manager = icon_manager
         self.file_manager = file_manager
@@ -106,22 +109,25 @@ class MainAppWindow(QMainWindow):
         layout = QHBoxLayout(container)
         self.setCentralWidget(container)
         
-        self.map_panel = MapPanel2D(self.engine, container)
-        layout.addWidget(self.map_panel)
+        self.map_panel = MapPanel2D(self.map_engine, container)
+        layout.addWidget(self.map_panel, 8)
+        
+        self.layer_panel = LayerPanel(self.icon_manager, self.chunk_engine, self.map_engine, container)
+        layout.addWidget(self.layer_panel, 1)
 
     def undo(self):
-        self.engine.history_manager.undo()
+        self.map_engine.history_manager.undo()
         self.map_panel.update()
 
     def redo(self):
-        self.engine.history_manager.redo()
+        self.map_engine.history_manager.redo()
         self.map_panel.update()
 
     def new_map(self):
         if not self._prompt_save_if_needed():
             return
-        self.engine.chunk_engine.reset()
-        self.engine.history_manager.clear()
+        self.map_engine.chunk_engine.reset()
+        self.map_engine.history_manager.clear()
         self.current_filepath = None
         self.map_panel.update()
 
@@ -132,13 +138,13 @@ class MainAppWindow(QMainWindow):
         if filepath:
             self.file_manager.load_map(filepath)
             self.current_filepath = filepath
-            self.engine.history_manager.clear()
+            self.map_engine.history_manager.clear()
             self.map_panel.update()
 
     def save_map(self):
         if self.current_filepath:
             self.file_manager.save_map(self.current_filepath)
-            self.engine.history_manager.clear()
+            self.map_engine.history_manager.clear()
         else:
             self.save_map_as()
 
@@ -147,7 +153,7 @@ class MainAppWindow(QMainWindow):
         if filepath:
             self.file_manager.save_map(filepath)
             self.current_filepath = filepath
-            self.engine.history_manager.clear()
+            self.map_engine.history_manager.clear()
 
     def export_map(self):
         filepath, _ = QFileDialog.getSaveFileName(self, "Export as PNG", "", "PNG Image (*.png)")
@@ -155,7 +161,7 @@ class MainAppWindow(QMainWindow):
             self.file_manager.export_map_as_png(filepath)
 
     def _prompt_save_if_needed(self) -> bool:
-        if (len(self.engine.history_manager.undo_stack) == 0 and len(self.engine.history_manager.redo_stack) == 0):
+        if (len(self.map_engine.history_manager.undo_stack) == 0 and len(self.map_engine.history_manager.redo_stack) == 0):
             return True
 
         msg_box = QMessageBox()

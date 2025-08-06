@@ -59,7 +59,8 @@ def run():
     # --- UI Initialization ---
     # The main window needs access to various managers to wire up the UI
     window = MainAppWindow(
-        engine=map_engine,
+        chunk_engine=chunk_engine,
+        map_engine=map_engine,
         tool_manager=tool_manager,
         icon_manager=icon_manager,
         file_manager=file_manager
@@ -69,6 +70,8 @@ def run():
     # The map engine needs a reference to the map panel widget, which is created inside the main window.
     # This is a bit of a workaround for the circular dependency between engine and panel.
     map_engine.set_map_panel(window.get_map_panel())
+    
+    chunk_engine.layers_reordered.connect(window.get_map_panel().update)
 
     window.show()
     sys.exit(app.exec())

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from modules.chunk_engine import ChunkLayer
+from modules.chunk_engine import ChunkEngine, ChunkLayer
 import struct
 from loguru import logger
 from PIL import Image, ImageDraw
@@ -19,7 +19,7 @@ class FileManager:
     MAGIC_NUMBER = b"HMAP"
     VERSION = 1
 
-    def __init__(self, chunk_engine: ChunkLayer, map_engine: MapEngine2D):
+    def __init__(self, chunk_engine: ChunkEngine, map_engine: MapEngine2D):
         """
         Initializes the FileManager.
 
@@ -43,12 +43,16 @@ class FileManager:
                 # Write header
                 f.write(self.MAGIC_NUMBER)
                 f.write(struct.pack("I", self.VERSION))
+                
+                f.write(struct.pack("i", len(self.chunk_engine.layers)))
 
                 # Write modified cells
-                for coord in self.chunk_engine.modified_cells:
-                    color = self.chunk_engine.get_cell_data(coord)
-                    # Each record: x (int), y (int), r, g, b, a (float32)
-                    f.write(struct.pack("iiffff", coord[0], coord[1], *color))
+                for layer, cells in self.chunk_engine.get_all_modified_cells():
+                    f.write(struct.pack("i", len(cells)))
+                    for coord in cells:
+                        color = self.chunk_engine.get_layer_cell_data(layer, coord)
+                        # Each record: x (int), y (int), r, g, b, a (float32)
+                        f.write(struct.pack("iiffff", coord[0], coord[1], *color))
             logger.info(f"Map saved to {filepath}")
         except IOError as e:
             logger.error(f"Error saving map to {filepath}: {e}")
@@ -72,14 +76,28 @@ class FileManager:
 
                 # Clear existing map data
                 self.chunk_engine.reset()
+                
+                layers = f.read(4)
+                if not layers:
+                    logger.error("Unexpected EOF when reading layer count!")
+                    raise
+                layers = struct.unpack("i", layers)[0]
 
                 # Read modified cells
-                while True:
-                    chunk = f.read(24)
-                    if not chunk:
-                        break
-                    x, y, r, g, b, a = struct.unpack("iiffff", chunk)
-                    self.chunk_engine.set_cell_data((x, y), np.array([r, g, b, a], dtype=np.float32))
+                for _ in range(layers):
+                    num = f.read(4)
+                    if not num:
+                        logger.error("Unexpected EOF when reading cell number!")
+                        raise
+                    num_cells = struct.unpack("i", num)[0]
+                    self.chunk_engine.insert_layer()
+                    for _ in range(num_cells):
+                        chunk = f.read(24)
+                        if not chunk:
+                            logger.error("Unexpected EOF when reading cell data!")
+                            raise
+                        x, y, r, g, b, a = struct.unpack("iiffff", chunk)
+                        self.chunk_engine.set_cell_data((x, y), np.array([r, g, b, a], dtype=np.float32))
             
             # self.map_engine.update_and_render_chunks()
             logger.info(f"Map loaded from {filepath}")

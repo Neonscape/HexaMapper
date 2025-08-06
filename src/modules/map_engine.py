@@ -328,7 +328,6 @@ class MapEngine2D:
         DATA_DIMENSIONS = self.config.hex_map_engine.data_dimensions
         
         if chunk_coord in self.chunk_buffers:
-            print(chunk_coord)
             buf = self.chunk_buffers[chunk_coord]
             instance_vbo_id, filled_vao_id, outline_vao_id = buf["instance_vbo"], buf["filled_vao"], buf["outline_vao"]
             glDeleteBuffers(1, [instance_vbo_id])
