@@ -109,7 +109,7 @@ class MapPanel2D(QOpenGLWidget):
             min_y_world = None
             max_y_world = None
 
-            if not self.engine.chunk_engine.get_modified_cells():
+            if not self.engine.chunk_engine.get_modified_cells_in_active_layer():
                 # No edits – export the current viewport
                 tl_world = self.engine.screen_to_world((0, 0))
                 br_world = self.engine.screen_to_world((self.width(), self.height()))
@@ -140,7 +140,7 @@ class MapPanel2D(QOpenGLWidget):
             else:
                 # 1. Build the axis–aligned rectangle that contains every modified cell
                 gpos = [get_center_position_from_global_coord(c, hex_radius)
-                        for c in self.engine.chunk_engine.get_modified_cells()]
+                        for c in self.engine.chunk_engine.get_modified_cells_in_active_layer()]
                 min_x_world = min(c[0] for c in gpos)
                 max_x_world = max(c[0] for c in gpos)
                 min_y_world = min(c[1] for c in gpos)

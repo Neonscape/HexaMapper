@@ -268,6 +268,7 @@ class MapEngine2D:
         Updates dirty chunks and renders all visible chunks to the screen.
         """
         dirty_chunks = self.chunk_engine.get_and_clear_dirty_chunks()
+        logger.debug(f"Updating chunks {dirty_chunks}")
         for chunk_coord in dirty_chunks:
             self._update_chunk_instance_buffer(chunk_coord)
         

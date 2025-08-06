@@ -48,7 +48,7 @@ class LayerEntryContainer(QListWidget):
         for item in self.items:
             self.addItem(item)
             self.setItemWidget(item, item.layer_entry)
-        self.setCurrentItem(self.items[len(self.items) - self.chunk_engine.current_layer - 1])
+        self.setCurrentItem(self.items[len(self.items) - self.chunk_engine.active_layer_idx - 1])
         
     def _handle_rows_moved(self, parent, start, end, destination, row_count):
         """
@@ -83,7 +83,7 @@ class LayerEntryContainer(QListWidget):
             
     def _handle_item_clicked(self, item: QListWidgetItem):
         idx = len(self.items) - self.items.index(item) - 1
-        self.chunk_engine.current_layer = idx
+        self.chunk_engine.active_layer_idx = idx
         logger.debug(f"Set active layer to {idx}")
             
         
@@ -140,11 +140,11 @@ class LayerPanel(QWidget):
         self.layer_entry_container.build_entries()
         
     def _move_layer_up_callback(self):
-        self.chunk_engine.reorder_layer(self.chunk_engine.current_layer, self.chunk_engine.current_layer + 1)
+        self.chunk_engine.reorder_layer(self.chunk_engine.active_layer_idx, self.chunk_engine.active_layer_idx + 1)
         self.layer_entry_container.build_entries()
         
     def _move_layer_down_callback(self):
-        self.chunk_engine.reorder_layer(self.chunk_engine.current_layer, self.chunk_engine.current_layer - 1)
+        self.chunk_engine.reorder_layer(self.chunk_engine.active_layer_idx, self.chunk_engine.active_layer_idx - 1)
         self.layer_entry_container.build_entries()
         
         

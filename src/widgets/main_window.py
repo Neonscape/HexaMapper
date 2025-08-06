@@ -130,6 +130,7 @@ class MainAppWindow(QMainWindow):
         self.map_engine.history_manager.clear()
         self.current_filepath = None
         self.map_panel.update()
+        self.layer_panel.layer_entry_container.build_entries()
 
     def open_map(self):
         if not self._prompt_save_if_needed():

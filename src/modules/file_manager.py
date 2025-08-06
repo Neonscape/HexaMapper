@@ -3,10 +3,9 @@ from typing import TYPE_CHECKING
 from modules.chunk_engine import ChunkEngine, ChunkLayer
 import struct
 from loguru import logger
-from PIL import Image, ImageDraw
+from PIL import Image
 import numpy as np
 from OpenGL.GL import *
-from modules.map_helpers import get_center_position_from_global_coord, global_coord_to_chunk_coord
 
 if TYPE_CHECKING:
     from modules.map_engine import MapEngine2D

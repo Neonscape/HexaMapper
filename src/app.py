@@ -71,7 +71,7 @@ def run():
     # This is a bit of a workaround for the circular dependency between engine and panel.
     map_engine.set_map_panel(window.get_map_panel())
     
-    chunk_engine.layers_reordered.connect(window.get_map_panel().update)
+    chunk_engine.need_repaint.connect(window.get_map_panel().update)
 
     window.show()
     sys.exit(app.exec())

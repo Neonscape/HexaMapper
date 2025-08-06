@@ -39,9 +39,8 @@ class LayerEntry(QWidget):
         layout.addWidget(self.label, 5)
         
     def toggle_visibility(self):
-        self.layer.is_visible = not self.layer.is_visible
         self.btn.setIcon(self.icon_visible if self.layer.is_visible else self.icon_hidden)
-        self.map_engine.map_panel.update()
+        self.chunk_engine.toggle_visibility(self.layer)
 
 class LayerListItem(QListWidgetItem):
     def __init__(self, layer_entry: LayerEntry, parent=None):
