@@ -40,7 +40,7 @@ def run():
         shader_manager=shader_manager
     )
     
-    file_manager = FileManager(chunk_engine=chunk_engine, map_engine=map_engine)
+    file_manager = FileManager(config=config, chunk_engine=chunk_engine, map_engine=map_engine)
     
     # The tool manager needs the map engine to pass to tools
     tool_manager = ToolManager(map_engine=map_engine)

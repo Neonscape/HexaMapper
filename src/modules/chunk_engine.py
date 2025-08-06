@@ -148,7 +148,7 @@ class ChunkEngine(QObject):
         self.active_layer_idx = 0
     
     def set_cell_data(self, global_coord: tuple[int, int], data: np.ndarray, layer: ChunkLayer = None):
-        logger.debug(f"Setting cell data on layer {self.active_layer_idx}")
+
         if layer is None:
             layer = self.layers[self.active_layer_idx]
         layer.set_cell_data(global_coords=global_coord, data=data)
@@ -182,24 +182,25 @@ class ChunkEngine(QObject):
 
         chunks = [l.get_chunk_data(chunk_coord) for l in self.layers if l.is_visible]
         modified_cells_list = [v for k, v in self.get_all_modified_cells().items() if self.layers[k].is_visible]
-        
-        if len(chunks) == 0:
-            # no chunk is visible, return default value
-            return np.tile(
+            
+        final_chunk = np.tile(
                 np.array(
                     self.config.hex_map_custom.default_cell_color.to_floats()
                     ).reshape((1, 1, 4)),
                 (16, 16, 1)
             )
-            
-        final_chunk = chunks[0].copy()
         
-        for i, chunk in enumerate(chunks[1:]):
+        if len(chunks) == 0:
+            return final_chunk
+        
+        for i, chunk in enumerate(chunks):
             for cell in modified_cells_list[i]:
                 chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(cell, self.config.hex_map_engine.chunk_size)
                 if chunk_x != chunk_coord[0] or chunk_y != chunk_coord[1]:
                     continue;
                 final_chunk[local_x, local_y] = chunk[local_x, local_y]
+        
+        # logger.debug(f"Chunks: {chunks}, Final merge result: {final_chunk}")
         
         return final_chunk
     
@@ -230,20 +231,29 @@ class ChunkEngine(QObject):
         self.active_layer_idx = idx
     
     def delete_active_layer(self):
+        layer = self.layers[self.active_layer_idx]
+        
+        for cell in layer.modified_cells:
+            chunk_x, chunk_y, _, _ = global_coord_to_chunk_coord(cell, self.config.hex_map_engine.chunk_size)
+            self.dirty_chunks.add((chunk_x, chunk_y))
+        
         del self.layers[self.active_layer_idx]
         if len(self.layers) == 0:
             self.insert_layer()
         self.active_layer_idx = max(0, self.active_layer_idx - 1)
+        
+        self.need_repaint.emit()
     
     def reorder_layer(self, from_idx: int, to_idx: int):
-        logger.debug(f"Reordering layer from {from_idx} to {to_idx}")
         if from_idx < 0 or from_idx >= len(self.layers) or to_idx < 0 or to_idx >= len(self.layers):
             logger.error("Invalid layer index")
             return
         if from_idx == to_idx:
             return
         
-        self.layers.insert(to_idx, self.layers.pop(from_idx))
+        layer = self.layers.pop(from_idx)
+        
+        self.layers.insert(to_idx, layer)
         
         if self.active_layer_idx == from_idx:
             self.active_layer_idx = to_idx
@@ -251,7 +261,10 @@ class ChunkEngine(QObject):
             self.active_layer_idx -= 1
         elif from_idx > self.active_layer_idx and to_idx < self.active_layer_idx:
             self.active_layer_idx += 1
-            
+        
+        for cell in layer.modified_cells:
+            chunk_x, chunk_y, _, _ = global_coord_to_chunk_coord(cell, self.config.hex_map_engine.chunk_size)
+            self.dirty_chunks.add((chunk_x, chunk_y))
         
         self.need_repaint.emit()
         logger.debug("Reload triggered")
@@ -262,10 +275,9 @@ class ChunkEngine(QObject):
     def get_active_layer_index(self):
         return self.active_layer_idx
 
-    def toggle_visibility(self, layer: ChunkLayer):
-        logger.debug(f"toggling visibility of layer {layer.desc}")
-        
+    def toggle_visibility(self, layer: ChunkLayer):        
         layer.is_visible = not layer.is_visible
+        
         
         # toggle the visibility mark and set the chunks
         # where cells have been modified as dirty.

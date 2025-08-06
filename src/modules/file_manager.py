@@ -7,6 +7,9 @@ from PIL import Image
 import numpy as np
 from OpenGL.GL import *
 
+from modules.map_helpers import global_coord_to_chunk_coord
+from modules.schema import ApplicationConfig
+
 if TYPE_CHECKING:
     from modules.map_engine import MapEngine2D
 
@@ -18,7 +21,7 @@ class FileManager:
     MAGIC_NUMBER = b"HMAP"
     VERSION = 1
 
-    def __init__(self, chunk_engine: ChunkEngine, map_engine: MapEngine2D):
+    def __init__(self, config: ApplicationConfig, chunk_engine: ChunkEngine, map_engine: MapEngine2D):
         """
         Initializes the FileManager.
 
@@ -27,6 +30,7 @@ class FileManager:
         :param map_engine: The MapEngine2D instance for exporting the map.
         :type map_engine: MapEngine2D
         """
+        self.config = config
         self.chunk_engine = chunk_engine
         self.map_engine = map_engine
 
@@ -46,7 +50,7 @@ class FileManager:
                 f.write(struct.pack("i", len(self.chunk_engine.layers)))
 
                 # Write modified cells
-                for layer, cells in self.chunk_engine.get_all_modified_cells():
+                for layer, cells in self.chunk_engine.get_all_modified_cells().items():
                     f.write(struct.pack("i", len(cells)))
                     for coord in cells:
                         color = self.chunk_engine.get_layer_cell_data(layer, coord)
@@ -97,6 +101,8 @@ class FileManager:
                             raise
                         x, y, r, g, b, a = struct.unpack("iiffff", chunk)
                         self.chunk_engine.set_cell_data((x, y), np.array([r, g, b, a], dtype=np.float32))
+                        chunk_x, chunk_y, _, _ = global_coord_to_chunk_coord((x, y), self.config.hex_map_engine.chunk_size)
+                        self.chunk_engine.dirty_chunks.add((chunk_x, chunk_y))
             
             # self.map_engine.update_and_render_chunks()
             logger.info(f"Map loaded from {filepath}")

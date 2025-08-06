@@ -141,6 +141,7 @@ class MainAppWindow(QMainWindow):
             self.current_filepath = filepath
             self.map_engine.history_manager.clear()
             self.map_panel.update()
+            self.layer_panel.layer_entry_container.build_entries()
 
     def save_map(self):
         if self.current_filepath:
