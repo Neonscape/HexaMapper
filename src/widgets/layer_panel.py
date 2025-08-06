@@ -1,5 +1,8 @@
 from loguru import logger
 from modules.chunk_engine import ChunkEngine
+from modules.commands.delete_layer_command import DeleteLayerCommand
+from modules.commands.new_layer_command import NewLayerCommand
+from modules.commands.reorder_layer_command import ReorderLayerCommand
 from modules.icon_manager import IconManager
 from modules.map_engine import MapEngine2D
 from widgets.layer_entry import LayerEntry, LayerListItem
@@ -13,6 +16,7 @@ from qtpy.QtWidgets import (
     QLabel,
     QListWidgetItem
 )
+from qtpy.QtCore import Signal
 
 
 class LayerEntryContainer(QListWidget):
@@ -63,8 +67,6 @@ class LayerEntryContainer(QListWidget):
         total = len(self.entries)
         from_idx = total - start - 1
         to_idx = total - row_count
-        
-        print(from_idx, to_idx, len(self.entries))
 
         # The QListWidget reorders its items *before* this signal is emitted.
         # The destination index is where the item *would have been* if the
@@ -76,7 +78,12 @@ class LayerEntryContainer(QListWidget):
             to_idx -= 1
         
         if from_idx != to_idx:
-            self.chunk_engine.reorder_layer(from_idx, to_idx)
+            command = ReorderLayerCommand(
+                self.chunk_engine,
+                from_idx,
+                to_idx
+            )
+            self.map_engine.history_manager.execute(command)
             
             # The UI is already reordered, so we just need to re-sync our entries list
             self.build_entries()
@@ -106,7 +113,6 @@ class LayerPanel(QWidget):
         self.btns_layout = QHBoxLayout()
         
         self.add_btn = QPushButton(icon_manager.get_icon("plus"), "", self)
-        # TODO: refactor this to process LayerEntryContainer
         self.add_btn.clicked.connect(self._add_layer_callback)
         
         self.minus_btn = QPushButton(icon_manager.get_icon("minus"), "", self)
@@ -132,20 +138,39 @@ class LayerPanel(QWidget):
         self.setLayout(self.layout)
         
     def _add_layer_callback(self):
-        self.chunk_engine.insert_layer()
-        self.layer_entry_container.build_entries()
+        command = NewLayerCommand(
+            self.chunk_engine
+        )
+        self.map_engine.history_manager.execute(command)
+        self.map_engine.history_manager.finish_action()
         
     def _delete_layer_callback(self):
-        self.chunk_engine.delete_active_layer()
-        self.layer_entry_container.build_entries()
+        command = DeleteLayerCommand(
+            self.chunk_engine,
+        )
+        self.map_engine.history_manager.execute(command)
+        self.map_engine.history_manager.finish_action()
         
     def _move_layer_up_callback(self):
-        self.chunk_engine.reorder_layer(self.chunk_engine.active_layer_idx, self.chunk_engine.active_layer_idx + 1)
-        self.layer_entry_container.build_entries()
+        if self.chunk_engine.active_layer_idx == len(self.chunk_engine.layers) - 1:
+            return # no need to move
+        
+        command = ReorderLayerCommand(
+            self.chunk_engine,
+            self.chunk_engine.active_layer_idx,
+            self.chunk_engine.active_layer_idx + 1
+        )
+        self.map_engine.history_manager.execute(command)
+        self.map_engine.history_manager.finish_action()
         
     def _move_layer_down_callback(self):
-        self.chunk_engine.reorder_layer(self.chunk_engine.active_layer_idx, self.chunk_engine.active_layer_idx - 1)
-        self.layer_entry_container.build_entries()
+        if self.chunk_engine.active_layer_idx == 0:
+            return # no need to move
         
-        
-        
+        command = ReorderLayerCommand(
+            self.chunk_engine,
+            self.chunk_engine.active_layer_idx,
+            self.chunk_engine.active_layer_idx - 1
+        )
+        self.map_engine.history_manager.execute(command)
+        self.map_engine.history_manager.finish_action()

@@ -125,6 +125,7 @@ class ChunkLayer:
 
 class ChunkEngine(QObject):
     need_repaint = Signal()
+    rebuild_entries = Signal()
     
     def __init__(self, config: ApplicationConfig):
         super().__init__()
@@ -229,45 +230,6 @@ class ChunkEngine(QObject):
             idx = self.active_layer_idx + 1
         self.layers.insert(idx, ChunkLayer(self.config, desc))
         self.active_layer_idx = idx
-    
-    def delete_active_layer(self):
-        layer = self.layers[self.active_layer_idx]
-        
-        for cell in layer.modified_cells:
-            chunk_x, chunk_y, _, _ = global_coord_to_chunk_coord(cell, self.config.hex_map_engine.chunk_size)
-            self.dirty_chunks.add((chunk_x, chunk_y))
-        
-        del self.layers[self.active_layer_idx]
-        if len(self.layers) == 0:
-            self.insert_layer()
-        self.active_layer_idx = max(0, self.active_layer_idx - 1)
-        
-        self.need_repaint.emit()
-    
-    def reorder_layer(self, from_idx: int, to_idx: int):
-        if from_idx < 0 or from_idx >= len(self.layers) or to_idx < 0 or to_idx >= len(self.layers):
-            logger.error("Invalid layer index")
-            return
-        if from_idx == to_idx:
-            return
-        
-        layer = self.layers.pop(from_idx)
-        
-        self.layers.insert(to_idx, layer)
-        
-        if self.active_layer_idx == from_idx:
-            self.active_layer_idx = to_idx
-        elif from_idx < self.active_layer_idx and to_idx > self.active_layer_idx:
-            self.active_layer_idx -= 1
-        elif from_idx > self.active_layer_idx and to_idx < self.active_layer_idx:
-            self.active_layer_idx += 1
-        
-        for cell in layer.modified_cells:
-            chunk_x, chunk_y, _, _ = global_coord_to_chunk_coord(cell, self.config.hex_map_engine.chunk_size)
-            self.dirty_chunks.add((chunk_x, chunk_y))
-        
-        self.need_repaint.emit()
-        logger.debug("Reload triggered")
         
     def get_active_layer(self):
         return self.layers[self.active_layer_idx]

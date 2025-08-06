@@ -72,6 +72,7 @@ def run():
     map_engine.set_map_panel(window.get_map_panel())
     
     chunk_engine.need_repaint.connect(window.get_map_panel().update)
+    chunk_engine.rebuild_entries.connect(window.layer_panel.layer_entry_container.build_entries)
 
     window.show()
     sys.exit(app.exec())
