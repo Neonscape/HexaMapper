@@ -1,14 +1,17 @@
 from qtpy.QtOpenGLWidgets import QOpenGLWidget
 from qtpy.QtGui import QSurfaceFormat
-from qtpy.QtCore import QPointF
+from qtpy.QtCore import QPointF, Qt
+from qtpy.QtWidgets import QLabel
 from OpenGL.GL import *
 import numpy as np
 from modules.map_engine import MapEngine2D
 from modules.event_handlers import MapPanel2DEventHandler
 from modules.map_helpers import global_coord_to_chunk_coord, global_pos_to_global_coord, get_center_position_from_global_coord
-
+from qtpy.QtCore import QElapsedTimer, Signal
 
 class MapPanel2D(QOpenGLWidget):
+    fps_update = Signal()
+    
     """
     A QOpenGLWidget subclass that serves as the main display panel for the 2D hex map.
     It handles OpenGL rendering, mouse interactions, and integrates with the MapEngine2D.
@@ -32,6 +35,12 @@ class MapPanel2D(QOpenGLWidget):
         # The event handler is responsible for all user interaction with the map
         self.event_handler = MapPanel2DEventHandler(self.engine)
         self.installEventFilter(self.event_handler)
+        
+        self.frametime_timer = QElapsedTimer()
+        self.lastframe_frametime: float = 0.0
+        
+        self.fps_label: QLabel = QLabel(f"FPS: 0", self)
+        self.fps_label.setGeometry(10, 10, 100, 30)
 
     def _configure_opengl(self):
         """
@@ -76,6 +85,13 @@ class MapPanel2D(QOpenGLWidget):
         """
         Paints the OpenGL content. This function is called whenever the widget needs to be updated.
         """
+        if not self.frametime_timer.isValid(): # first time painting
+            self.frametime_timer.start()
+        else:
+            self.lastframe_frametime = self.frametime_timer.elapsed() / 1000.0
+            self.frametime_timer.restart()
+            self.fps_label.setText(f"FPS: {int(1 / self.lastframe_frametime)}")
+        
         glClear(GL_COLOR_BUFFER_BIT)
         
         # self.engine.draw_gradient_background()

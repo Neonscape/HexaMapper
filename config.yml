@@ -16,7 +16,7 @@ hex_map_custom:
   outline_width: 1.0
 
 hex_map_view:
-  min_zoom: 0.02
+  min_zoom: 0.005
   max_zoom: 5.0
 
 hex_map_shaders:

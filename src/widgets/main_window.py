@@ -1,5 +1,5 @@
 from qtpy.QtWidgets import (
-    QWidget, QMainWindow, QLayout, QHBoxLayout, QMenuBar, QStatusBar, QMessageBox, QFileDialog
+    QWidget, QMainWindow, QHBoxLayout, QMessageBox, QFileDialog, QLabel
 )
 from qtpy.QtGui import QAction, QKeySequence
 from modules.chunk_engine import ChunkEngine
@@ -21,6 +21,7 @@ class MainAppWindow(QMainWindow):
         self.file_manager = file_manager
 
         self.map_panel: MapPanel2D | None = None
+        self.fps_label: QLabel | None = None
         self.current_filepath: str | None = None
         
         self.setWindowTitle(title)
@@ -180,3 +181,10 @@ class MainAppWindow(QMainWindow):
             return True
         else:
             return False
+        
+    def closeEvent(self, a0):
+        ret = self._prompt_save_if_needed()
+        if ret:
+            a0.accept()
+        else:
+            a0.ignore()
