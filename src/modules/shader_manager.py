@@ -13,6 +13,8 @@ class ShaderManager:
         """
         self.registered_programs: dict[str, tuple[str, str]] = {}
         self.compiled_programs : dict[str, int] = {}
+        self.uniforms: dict[str, list[str]] = {}
+        self.uniform_locations: dict[str, dict[str, int]] = {}
         self.vbos: dict[str, int] = {}
         self.vaos: dict[str, int] = {}
     
@@ -27,11 +29,15 @@ class ShaderManager:
             if program is None:
                 error_flag = True
             self.compiled_programs[name] = program
+            
+            self.uniform_locations[name] = dict()
+            for uniform in self.uniforms[name]:
+                self.uniform_locations[name][uniform] = glGetUniformLocation(program, uniform)
             logger.info(f"Compiled program {name} successfully.")
         
         logger.info(f"Shader compilation finished " + ("with errors." if error_flag else "successfully."))
     
-    def register_program(self, name: str, vertex_shader_path: str, fragment_shader_path: str):
+    def register_program(self, name: str, vertex_shader_path: str, fragment_shader_path: str, uniforms: list[str] = None):
         """
         Registers a shader program by name and its vertex/fragment shader file paths.
 
@@ -43,6 +49,8 @@ class ShaderManager:
         :type fragment_shader_path: str
         """
         self.registered_programs[name] = (vertex_shader_path, fragment_shader_path)
+        if uniforms is not None:
+            self.uniforms[name] = uniforms
 
     def get_program(self, name: str) -> int:
         """
@@ -54,6 +62,9 @@ class ShaderManager:
         :rtype: int
         """
         return self.compiled_programs[name]
+    
+    def get_uniforms(self, name: str) -> dict[str, int]:
+        return self.uniform_locations[name]
 
     def remove_program(self, name: str):
         """

@@ -46,7 +46,7 @@ class ChunkLayer:
             chunk_size = self.config.hex_map_engine.chunk_size
             data_dims = self.config.hex_map_engine.data_dimensions
             default_color = self.config.hex_map_custom.default_cell_color
-            self.chunks[chunk_coord] = np.full((chunk_size, chunk_size, data_dims), default_color, dtype=np.float32)
+            self.chunks[chunk_coord] = np.zeros((chunk_size, chunk_size, data_dims), dtype=np.float32)
             return self.chunks[chunk_coord]
         return self.chunks[chunk_coord]
     
@@ -79,7 +79,7 @@ class ChunkLayer:
             return
         chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(global_coords, self.config.hex_map_engine.chunk_size)
         chunk_data = self._get_or_create_chunk((chunk_x, chunk_y))
-        chunk_data[local_x, local_y] = self.config.hex_map_custom.default_cell_color
+        chunk_data[local_x, local_y] = np.zeros(self.config.hex_map_engine.data_dimensions, dtype=np.float32)
         self.dirty_chunks.add((chunk_x, chunk_y))
         self.modified_cells.remove(global_coords)
         
@@ -168,41 +168,55 @@ class ChunkEngine(QObject):
         return self.layers[layer].get_cell_data(global_coords=global_coord)
     
     def get_chunk_data(self, chunk_coord: tuple[int, int], layer: ChunkLayer = None) -> np.ndarray:
-        """returns the data of the chunk at the given coordinates;
-        if the layer param is not provided, defaults to visible data
+        """
+        高效地返回在给定坐标处，所有可见图层合并后的最终区块数据。
+        该实现使用Numpy向量化操作，避免了低效的Python循环。
 
         Args:
-            chunk_coord (tuple[int, int]): chunk pos for data
-            layer (ChunkLayer, optional): the layer to obtain data from. Defaults to None.
+            chunk_coord (tuple[int, int]): 需要获取数据的区块坐标。
+            layer (ChunkLayer, optional): 如果提供，则只返回该特定图层的数据。默认为None。
 
         Returns:
-            np.ndarray: chunk data.
+            np.ndarray: (16, 16, 4) 的区块数据数组。
         """
+        # 如果指定了单个图层，则行为不变
         if layer is not None:
             return layer.get_chunk_data(chunk_coord=chunk_coord)
 
-        chunks = [l.get_chunk_data(chunk_coord) for l in self.layers if l.is_visible]
-        modified_cells_list = [v for k, v in self.get_all_modified_cells().items() if self.layers[k].is_visible]
-            
-        final_chunk = np.tile(
-                np.array(
-                    self.config.hex_map_custom.default_cell_color.to_floats()
-                    ).reshape((1, 1, 4)),
-                (16, 16, 1)
-            )
-        
-        if len(chunks) == 0:
-            return final_chunk
-        
-        for i, chunk in enumerate(chunks):
-            for cell in modified_cells_list[i]:
-                chunk_x, chunk_y, local_x, local_y = global_coord_to_chunk_coord(cell, self.config.hex_map_engine.chunk_size)
-                if chunk_x != chunk_coord[0] or chunk_y != chunk_coord[1]:
-                    continue;
-                final_chunk[local_x, local_y] = chunk[local_x, local_y]
-        
-        # logger.debug(f"Chunks: {chunks}, Final merge result: {final_chunk}")
-        
+        # 步骤1：获取所有可见图层的列表
+        visible_layers = [l for l in self.layers if l.is_visible]
+
+        # 如果没有可见图层，返回一个完全透明的默认区块
+        if not visible_layers:
+            chunk_size = self.config.hex_map_engine.chunk_size
+            data_dims = self.config.hex_map_engine.data_dimensions
+            # 注意：这里的默认颜色应该代表“无内容”，即Alpha为0
+            default_color = self.config.hex_map_custom.default_cell_color.to_floats()
+            return np.full((chunk_size, chunk_size, data_dims), default_color, dtype=np.float32)
+
+        # 步骤2：将最底部的可见图层作为我们的“画布”或“最终结果”的初始状态
+        # 使用 .copy() 确保我们不会意外修改原始图层的数据
+        final_chunk = visible_layers[0].get_chunk_data(chunk_coord).copy()
+
+        # 步骤3：从下到上，逐层将上层数据合并到 final_chunk 上
+        # 我们从第二个可见图层开始循环 (索引为1)
+        if len(visible_layers) > 1:
+            for i in range(1, len(visible_layers)):
+                # 获取上层图层的完整区块数据 (16, 16, 4)
+                top_layer_data = visible_layers[i].get_chunk_data(chunk_coord)
+
+                # **核心向量化操作**
+                # 1. 创建一个布尔遮罩 (boolean mask)
+                #    这个遮罩的形状是 (16, 16)，其中的 True 代表上层图层中“有颜色”的像素
+                #    我们通过检查Alpha通道（索引为3）的值是否大于0来判断
+                mask = top_layer_data[:, :, 3] > 0.0
+
+                # 2. 使用遮罩进行赋值
+                #    这行代码的意思是：“在 final_chunk 数组中，所有在 mask 中为 True 的位置，
+                #    都用 top_layer_data 中对应位置的值来替换。”
+                #    这一个操作就取代了之前成千上万次的循环和if判断。
+                final_chunk[mask] = top_layer_data[mask]
+
         return final_chunk
     
     def get_modified_cells_in_active_layer(self):

@@ -52,9 +52,9 @@ class MapEngine2D(QObject):
         self.map_panel: MapPanel2D | None = None # Set later via set_map_panel
         self.tool_manager: ToolManager | None = None # Set later via set_tool_manager
 
-        self.shader_manager.register_program("hex_shader", self.config.hex_map_shaders.unit.vertex, self.config.hex_map_shaders.unit.fragment)
-        self.shader_manager.register_program("bg_shader", self.config.hex_map_shaders.background.vertex, self.config.hex_map_shaders.background.fragment)
-        self.shader_manager.register_program("cursor_shader", self.config.hex_map_shaders.cursor.vertex, self.config.hex_map_shaders.cursor.fragment)
+        self.shader_manager.register_program("hex_shader", self.config.hex_map_shaders.unit.vertex, self.config.hex_map_shaders.unit.fragment, ["projection", "view", "color", "drawMode"])
+        self.shader_manager.register_program("bg_shader", self.config.hex_map_shaders.background.vertex, self.config.hex_map_shaders.background.fragment, ["topColor", "bottomColor", "viewportHeight"])
+        self.shader_manager.register_program("cursor_shader", self.config.hex_map_shaders.cursor.vertex, self.config.hex_map_shaders.cursor.fragment, ["projection", "view", "center_pos", "radius", "color", "thickness"])
         
         self.chunk_buffers: dict[tuple[int, int], dict[str, int]] = {}
         self.camera = Camera2D()
@@ -199,9 +199,10 @@ class MapEngine2D(QObject):
         
         pg = self.shader_manager.get_program("bg_shader")
         glUseProgram(pg)
-        glUniform4f(glGetUniformLocation(pg, "topColor"), *(self.config.background.grad_color_0))
-        glUniform4f(glGetUniformLocation(pg, "bottomColor"), *(self.config.background.grad_color_1))
-        glUniform1f(glGetUniformLocation(pg, "viewportHeight"), float(height))
+        uniforms = self.shader_manager.get_uniforms("bg_shader")
+        glUniform4f(uniforms["topColor"], *(self.config.background.grad_color_0))
+        glUniform4f(uniforms["bottomColor"], *(self.config.background.grad_color_1))
+        glUniform1f(uniforms["viewportHeight"], float(height))
         
         # Create a temporary quad for the background of the given size
         vertices = np.array([
@@ -240,9 +241,11 @@ class MapEngine2D(QObject):
         """
         pg = self.shader_manager.get_program("hex_shader")
         glUseProgram(pg)
+        
+        uniforms = self.shader_manager.get_uniforms("hex_shader")
 
-        glUniformMatrix4fv(glGetUniformLocation(pg, "projection"), 1, GL_TRUE, proj_mat)
-        glUniformMatrix4fv(glGetUniformLocation(pg, "view"), 1, GL_TRUE, view_mat)
+        glUniformMatrix4fv(uniforms["projection"], 1, GL_TRUE, proj_mat)
+        glUniformMatrix4fv(uniforms["view"], 1, GL_TRUE, view_mat)
 
         for chunk_coord in chunks_to_render:
             if chunk_coord not in self.chunk_buffers:
@@ -251,14 +254,14 @@ class MapEngine2D(QObject):
             chunk_buffer = self.chunk_buffers[chunk_coord]
 
             # Draw filled hexes
-            glUniform1i(glGetUniformLocation(pg, "drawMode"), DrawMode.DRAW_FILLED.value)
-            glUniform4f(glGetUniformLocation(pg, "color"), *(self.config.hex_map_custom.default_cell_color))
+            glUniform1i(uniforms["drawMode"], DrawMode.DRAW_FILLED.value)
+            glUniform4f(uniforms["color"], *(self.config.hex_map_custom.default_cell_color))
             glBindVertexArray(chunk_buffer["filled_vao"])
             glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 8, self.config.hex_map_engine.chunk_size ** 2)
 
             # Draw outlines
-            glUniform1i(glGetUniformLocation(pg, "drawMode"), DrawMode.DRAW_OUTLINE.value)
-            glUniform4f(glGetUniformLocation(pg, "color"), *(self.config.hex_map_custom.outline_color))
+            glUniform1i(uniforms["drawMode"], DrawMode.DRAW_OUTLINE.value)
+            glUniform4f(uniforms["color"], *(self.config.hex_map_custom.outline_color))
             glLineWidth(self.config.hex_map_custom.outline_width)
             glBindVertexArray(chunk_buffer["outline_vao"])
             glDrawArraysInstanced(GL_LINE_LOOP, 0, 6, self.config.hex_map_engine.chunk_size ** 2)
@@ -302,17 +305,19 @@ class MapEngine2D(QObject):
 
             proj_mat = self._create_projection_matrix()
             view_mat = self._create_view_matrix()
+            
+            uniforms = self.shader_manager.get_uniforms("cursor_shader")
 
-            glUniformMatrix4fv(glGetUniformLocation(pg, "projection"), 1, GL_TRUE, proj_mat)
-            glUniformMatrix4fv(glGetUniformLocation(pg, "view"), 1, GL_TRUE, view_mat)
+            glUniformMatrix4fv(uniforms["projection"], 1, GL_TRUE, proj_mat)
+            glUniformMatrix4fv(uniforms["view"], 1, GL_TRUE, view_mat)
 
             radius = visual_aid_info.get("radius", 1.0) * self.config.hex_map_engine.hex_radius
             color = visual_aid_info.get("color", (1.0, 1.0, 1.0, 1.0))
             
-            glUniform2f(glGetUniformLocation(pg, "center_pos"), mouse_world_pos.x(), mouse_world_pos.y())
-            glUniform1f(glGetUniformLocation(pg, "radius"), radius)
-            glUniform4f(glGetUniformLocation(pg, "color"), *color)
-            glUniform1f(glGetUniformLocation(pg, "thickness"), 0.05) # TODO: make this configurable
+            glUniform2f(uniforms["center_pos"], mouse_world_pos.x(), mouse_world_pos.y())
+            glUniform1f(uniforms["radius"], radius)
+            glUniform4f(uniforms["color"], *color)
+            glUniform1f(uniforms["thickness"], 0.05) # TODO: make this configurable
 
             glBindVertexArray(self.shader_manager.get_vao("cursor_quad"))
             glDrawArrays(GL_TRIANGLES, 0, 6)
@@ -320,71 +325,97 @@ class MapEngine2D(QObject):
             glBindVertexArray(0)
             glUseProgram(0)
 
+    # map_engine.py:MapEngine2D
+
     def _update_chunk_instance_buffer(self, chunk_coord: tuple[int, int]):
         """
-        Generates instance data (position, color) for a given chunk and uploads it to the GPU.
-
-        :param chunk_coord: The (x, y) coordinates of the chunk.
-        :type chunk_coord: tuple[int, int]
+        高效地创建或更新一个Chunk的实例VBO。
+        - 如果Chunk首次出现，则为其创建并分配GPU资源（VAO和VBO）。
+        - 如果Chunk已存在，则仅使用glBufferSubData更新其VBO内容。
+        - 根据设计，GPU资源一旦创建将永不销死。
         """
         
-        DATA_DIMENSIONS = self.config.hex_map_engine.data_dimensions
-        
-        if chunk_coord in self.chunk_buffers:
-            buf = self.chunk_buffers[chunk_coord]
-            instance_vbo_id, filled_vao_id, outline_vao_id = buf["instance_vbo"], buf["filled_vao"], buf["outline_vao"]
-            glDeleteBuffers(1, [instance_vbo_id])
-            glDeleteVertexArrays(1, [filled_vao_id])
-            glDeleteVertexArrays(1, [outline_vao_id])
-            
+        # 步骤1：准备当前帧需要渲染的实例数据
         chunk_data = self.chunk_engine.get_chunk_data(chunk_coord)
-        # Ensure the numpy array has the correct float32 dtype for OpenGL
         instance_data = np.array(self._generate_chunk_instance_data(chunk_coord, chunk_data), dtype=np.float32)
         
+        # 步骤2：检查这个Chunk的GPU资源是否已经创建
+        if chunk_coord not in self.chunk_buffers:
+            # --- Chunk首次出现，执行“创建”逻辑 ---
+            # 这个代码块只会在一个新区块首次被绘制时执行一次。
+            
+            # 定义实例数据相关的常量
+            # 因为大小固定，我们可以直接使用当前生成的数据大小
+            buffer_size = instance_data.nbytes
+            stride = (2 + self.config.hex_map_engine.data_dimensions) * sizeof(GLfloat)
+    
+            # 创建VAO和VBO
+            filled_vao = glGenVertexArrays(1)
+            outline_vao = glGenVertexArrays(1)
+            instance_vbo = glGenBuffers(1)
+    
+            # ---- 设置 "filled_vao" ----
+            glBindVertexArray(filled_vao)
+            
+            # 绑定六边形形状的顶点VBO
+            glBindBuffer(GL_ARRAY_BUFFER, self.shader_manager.get_vbo("hex_filled"))
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), ctypes.c_void_p(0))
+            glEnableVertexAttribArray(0)
+            
+            # 绑定实例数据VBO（包含所有六边形的位置和颜色）
+            glBindBuffer(GL_ARRAY_BUFFER, instance_vbo)
+            # **关键点1：分配并上传初始数据**
+            # 使用 GL_DYNAMIC_DRAW 表示我们期望这个缓冲区的内容会频繁更新。
+            glBufferData(GL_ARRAY_BUFFER, buffer_size, instance_data, GL_DYNAMIC_DRAW)
+            
+            # 设置实例属性指针 (位置和颜色)
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
+            glEnableVertexAttribArray(1)
+            glVertexAttribDivisor(1, 1) # 每1个实例更新一次此属性
+            
+            glVertexAttribPointer(2, self.config.hex_map_engine.data_dimensions, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(2 * sizeof(GLfloat)))
+            glEnableVertexAttribArray(2)
+            glVertexAttribDivisor(2, 1)
+    
+            # ---- 设置 "outline_vao" (与上面类似) ----
+            glBindVertexArray(outline_vao)
+            glBindBuffer(GL_ARRAY_BUFFER, self.shader_manager.get_vbo("hex_outline"))
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), ctypes.c_void_p(0))
+            glEnableVertexAttribArray(0)
+            
+            glBindBuffer(GL_ARRAY_BUFFER, instance_vbo) # 复用同一个实例VBO
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
+            glEnableVertexAttribArray(1)
+            glVertexAttribDivisor(1, 1)
+            
+            # 将新创建的GPU对象句柄保存起来，供后续更新使用
+            self.chunk_buffers[chunk_coord] = {
+                "filled_vao": filled_vao,
+                "outline_vao": outline_vao,
+                "instance_vbo": instance_vbo
+            }
+            
+            # 解绑所有对象，这是一个好习惯
+            glBindBuffer(GL_ARRAY_BUFFER, 0)
+            glBindVertexArray(0)
+            
+            # 注意：由于我们已经在创建时上传了数据，所以对于新区块无需再次更新。
+            # 函数到此可以直接结束。
+            return
+    
+        # --- 如果代码执行到这里，说明Chunk已经存在，执行“更新”逻辑 ---
         
-        filled_vao = glGenVertexArrays(1)
-        glBindVertexArray(filled_vao)
+        # **关键点2：高效更新缓冲区内容**
+        # 从字典中获取已存在的VBO ID
+        instance_vbo_id = self.chunk_buffers[chunk_coord]["instance_vbo"]
+        glBindBuffer(GL_ARRAY_BUFFER, instance_vbo_id)
         
-        glBindBuffer(GL_ARRAY_BUFFER, self.shader_manager.get_vbo("hex_filled"))
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), ctypes.c_void_p(0))
-        glEnableVertexAttribArray(0)
-        
-        instance_vbo = glGenBuffers(1)
-        glBindBuffer(GL_ARRAY_BUFFER, instance_vbo)
-        glBufferData(GL_ARRAY_BUFFER, instance_data.nbytes, instance_data, GL_STATIC_DRAW)
-        
-        stride = (2 + DATA_DIMENSIONS) * sizeof(GLfloat)
-        # Position attribute
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
-        glEnableVertexAttribArray(1)
-        glVertexAttribDivisor(1, 1)
-        
-        # Color attribute for the filled hexagon
-        glVertexAttribPointer(2, DATA_DIMENSIONS, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(2 * sizeof(GLfloat)))
-        glEnableVertexAttribArray(2)
-        glVertexAttribDivisor(2, 1)
-        
-        # Points for the outline to draw (x1, y1), (x2, y2), ...
-        outline_vao = glGenVertexArrays(1)
-        glBindVertexArray(outline_vao)
-        glBindBuffer(GL_ARRAY_BUFFER, self.shader_manager.get_vbo("hex_outline"))
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), ctypes.c_void_p(0))
-        glEnableVertexAttribArray(0)
-        
-        # We only need the offset passed in the first step
-        glBindBuffer(GL_ARRAY_BUFFER, instance_vbo)
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
-        glEnableVertexAttribArray(1)
-        glVertexAttribDivisor(1, 1)
-        
+        # 使用 glBufferSubData 仅更新VBO中的数据，这非常快。
+        # 它的作用就像内存中的 memcpy。
+        glBufferSubData(GL_ARRAY_BUFFER, 0, instance_data.nbytes, instance_data)
+    
+        # 解绑，防止意外修改
         glBindBuffer(GL_ARRAY_BUFFER, 0)
-        glBindVertexArray(0)
-        
-        self.chunk_buffers[chunk_coord] = {
-            "filled_vao": filled_vao,
-            "instance_vbo": instance_vbo,
-            "outline_vao": outline_vao
-        }
     
     def _generate_chunk_instance_data(self, chunk_coord: tuple[int, int], chunk_data: np.ndarray):
         """

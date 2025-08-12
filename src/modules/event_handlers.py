@@ -34,10 +34,10 @@ class MapPanel2DEventHandler(QObject):
             
             if mouse_event.buttons() & Qt.MouseButton.LeftButton:
                 self.drag_button = "Left"
-            elif mouse_event.buttons() & Qt.MouseButton.RightButton:
-                self.drag_button = "Right"
                 if self.engine.tool_manager:
                     self.engine.tool_manager.handle_mouse_press(mouse_event)
+            elif mouse_event.buttons() & Qt.MouseButton.RightButton:
+                self.drag_button = "Right"
             elif mouse_event.buttons() & Qt.MouseButton.MiddleButton:
                 self.drag_button = "Middle"
             
@@ -47,7 +47,7 @@ class MapPanel2DEventHandler(QObject):
         # --- Handle Mouse Release Events ---
         elif event.type() == QEvent.Type.MouseButtonRelease:
             mouse_event: QMouseEvent = event
-            if self.drag_button == "Right":
+            if self.drag_button == "Left":
                 if self.engine.tool_manager:
                     self.engine.tool_manager.handle_mouse_release(mouse_event)
             self.dragging = False
@@ -63,7 +63,7 @@ class MapPanel2DEventHandler(QObject):
             
             if self.drag_button == "Middle" and self.dragging:
                 self.engine.move_view(self.last_mouse_pos, current_pos)
-            elif self.drag_button == "Right" and self.dragging:
+            elif self.drag_button == "Left" and self.dragging:
                 if self.engine.tool_manager:
                     self.engine.tool_manager.handle_mouse_move(mouse_event)
             else: 

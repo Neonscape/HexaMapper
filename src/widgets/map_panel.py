@@ -1,3 +1,5 @@
+import cProfile
+import pstats
 from qtpy.QtOpenGLWidgets import QOpenGLWidget
 from qtpy.QtGui import QSurfaceFormat
 from qtpy.QtCore import QPointF, Qt
@@ -8,6 +10,7 @@ from modules.map_engine import MapEngine2D
 from modules.event_handlers import MapPanel2DEventHandler
 from modules.map_helpers import global_coord_to_chunk_coord, global_pos_to_global_coord, get_center_position_from_global_coord
 from qtpy.QtCore import QElapsedTimer, Signal
+from modules.config import IS_PROFILING
 
 class MapPanel2D(QOpenGLWidget):
     fps_update = Signal()
@@ -53,6 +56,10 @@ class MapPanel2D(QOpenGLWidget):
         
         # 连接地图引擎变换信号
         engine.transform_changed.connect(self.update_control_view_transform)
+        
+        if IS_PROFILING:
+            self.profiler = cProfile.Profile()
+            self.profile_cnt = 0
 
     def _configure_opengl(self):
         """
@@ -98,13 +105,24 @@ class MapPanel2D(QOpenGLWidget):
         """
         Paints the OpenGL content. This function is called whenever the widget needs to be updated.
         """
+        
+        if IS_PROFILING:
+            if self.profile_cnt == 500:
+                stats = pstats.Stats(self.profiler).sort_stats('cumulative')
+                stats.print_stats(20)
+
+            if self.profile_cnt < 500:
+                self.profiler.enable(True, True)
+        
         if not self.frametime_timer.isValid(): # first time painting
             self.frametime_timer.start()
         else:
             self.lastframe_frametime = self.frametime_timer.elapsed() / 1000.0
             self.frametime_timer.restart()
             self.fps_label.setText(f"FPS: {int(1 / self.lastframe_frametime)}")
-        
+            
+        bg_color = self.engine.config.hex_map_custom.default_cell_color.to_floats()
+        glClearColor(*bg_color)
         glClear(GL_COLOR_BUFFER_BIT)
         
         # self.engine.draw_gradient_background()
@@ -116,8 +134,11 @@ class MapPanel2D(QOpenGLWidget):
             mouse_world_pos = self.engine.screen_to_world((pos.x(), pos.y()))
             self.engine.draw_tool_visual_aid(mouse_world_pos)
         
-        # 控件层（QGraphicsView）会自动渲染，无需显式调用
-        # 删除对shader_manager.get_painter()的调用
+        if IS_PROFILING:
+            if self.profile_cnt < 500:
+                self.profiler.disable()
+                print(self.profile_cnt)
+                self.profile_cnt += 1
         
     def update_control_view_transform(self, pan_x, pan_y, zoom):
         """更新控件渲染层变换"""

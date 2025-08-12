@@ -14,6 +14,11 @@ from modules.config import load_config
 from modules.tools.draw_tool import DrawTool
 from modules.tools.eraser_tool import EraserTool
 
+from modules.config import APPLICATION_MODE
+if APPLICATION_MODE == 'RELEASE':
+    import OpenGL
+    OpenGL.ERROR_CHECKING = False
+
 def run():
     """
     Initializes and runs the main application.

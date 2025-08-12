@@ -24,3 +24,6 @@ def load_config() -> ApplicationConfig | None:
     except Exception as e:
         logger.error(f"An unexpected error occurred while loading config: {e}")
         return None
+    
+APPLICATION_MODE: Literal['DEBUG', 'RELEASE'] = 'RELEASE'
+IS_PROFILING: bool = False

@@ -24,6 +24,9 @@ class CustomToolbar(QToolBar):
         # self.setFixedHeight(60)
         self.layout().setSpacing(5)
         
+        self.setFixedHeight(60)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        
         # QToolBar inherently manages its own layout.
         # If you want to put other widgets (like tool_configs) *alongside* the buttons
         # and manage their layout, you should create a central widget or separate toolbars/widgets.
