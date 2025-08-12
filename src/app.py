@@ -1,3 +1,10 @@
+from loguru import logger
+from modules.config import APPLICATION_MODE
+if APPLICATION_MODE == 'RELEASE':
+    import OpenGL
+    OpenGL.ERROR_CHECKING = False
+    logger.info("OpenGL error checking disabled")
+
 import sys
 from qtpy.QtWidgets import QApplication
 from modules.tools.dropper_tool import DropperTool
@@ -8,16 +15,11 @@ from modules.icon_manager import IconManager
 from modules.tool_manager import ToolManager
 from modules.shader_manager import ShaderManager
 from modules.history_manager import HistoryManager
-from modules.chunk_engine import ChunkLayer, ChunkEngine
+from modules.chunk_engine import ChunkEngine
 from modules.file_manager import FileManager
 from modules.config import load_config
 from modules.tools.draw_tool import DrawTool
 from modules.tools.eraser_tool import EraserTool
-
-from modules.config import APPLICATION_MODE
-if APPLICATION_MODE == 'RELEASE':
-    import OpenGL
-    OpenGL.ERROR_CHECKING = False
 
 def run():
     """

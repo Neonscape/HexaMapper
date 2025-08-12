@@ -46,6 +46,7 @@ class MapPanel2D(QOpenGLWidget):
         self.paint_timer.start()
         
         self.fps_label: QLabel = QLabel(f"FPS: 0", self)
+        self.fps_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.fps_label.setGeometry(10, 10, 100, 30)
         
         # 创建控件渲染层
