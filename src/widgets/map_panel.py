@@ -2,7 +2,7 @@ import cProfile
 import pstats
 from qtpy.QtOpenGLWidgets import QOpenGLWidget
 from qtpy.QtGui import QSurfaceFormat
-from qtpy.QtCore import QPointF, Qt
+from qtpy.QtCore import QPointF, Qt, QTimer
 from qtpy.QtWidgets import QLabel, QGraphicsView, QGraphicsScene  # 添加控件渲染层支持
 from OpenGL.GL import *
 import numpy as np
@@ -39,8 +39,11 @@ class MapPanel2D(QOpenGLWidget):
         self.event_handler = MapPanel2DEventHandler(self.engine)
         self.installEventFilter(self.event_handler)
         
-        self.frametime_timer = QElapsedTimer()
-        self.lastframe_frametime: float = 0.0
+        self.paint_count = 0
+        self.paint_timer = QTimer(self)
+        self.paint_timer.setInterval(1000)
+        self.paint_timer.timeout.connect(self.update_fps_label)
+        self.paint_timer.start()
         
         self.fps_label: QLabel = QLabel(f"FPS: 0", self)
         self.fps_label.setGeometry(10, 10, 100, 30)
@@ -114,12 +117,7 @@ class MapPanel2D(QOpenGLWidget):
             if self.profile_cnt < 500:
                 self.profiler.enable(True, True)
         
-        if not self.frametime_timer.isValid(): # first time painting
-            self.frametime_timer.start()
-        else:
-            self.lastframe_frametime = self.frametime_timer.elapsed() / 1000.0
-            self.frametime_timer.restart()
-            self.fps_label.setText(f"FPS: {int(1 / self.lastframe_frametime)}")
+        self.paint_count += 1
             
         bg_color = self.engine.config.hex_map_custom.default_cell_color.to_floats()
         glClearColor(*bg_color)
@@ -139,6 +137,10 @@ class MapPanel2D(QOpenGLWidget):
                 self.profiler.disable()
                 print(self.profile_cnt)
                 self.profile_cnt += 1
+                
+    def update_fps_label(self):
+        self.fps_label.setText(f"FPS: {self.paint_count}")
+        self.paint_count = 0
         
     def update_control_view_transform(self, pan_x, pan_y, zoom):
         """更新控件渲染层变换"""
