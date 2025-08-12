@@ -1,11 +1,14 @@
 from qtpy.QtWidgets import (
-    QWidget, QMainWindow, QHBoxLayout, QMessageBox, QFileDialog, QLabel
+    QWidget, QMainWindow, QHBoxLayout, QMessageBox, QFileDialog, QLabel, QSplitter, QSplitterHandle
 )
+from qtpy.QtCore import Qt
 from qtpy.QtGui import QAction, QKeySequence
 from modules.chunk_engine import ChunkEngine
 from modules.file_manager import FileManager
 from widgets.layer_panel import LayerPanel
 from widgets.map_panel import MapPanel2D
+from widgets.properties_panel import PropertiesPanel
+from widgets.side_panel import SidePanel
 from widgets.toolbar import CustomToolbar
 from modules.map_engine import MapEngine2D
 from modules.tool_manager import ToolManager
@@ -103,18 +106,33 @@ class MainAppWindow(QMainWindow):
             tooltip="Dropper Tool",
             callback=lambda: self.tool_manager.set_active_tool("dropper")
         )
+        toolbar.register_tool(
+            tool=self.tool_manager.get_tool("select"),
+            name="select",
+            tooltip="Select Tool",
+            callback=lambda: self.tool_manager.set_active_tool("select")
+        )
         toolbar.finalize()
         
         # --- Central Widget ---
         container = QWidget(self)
-        layout = QHBoxLayout(container)
         self.setCentralWidget(container)
         
-        self.map_panel = MapPanel2D(self.map_engine, container)
-        layout.addWidget(self.map_panel, 8)
+        splitter = QSplitter(self)
         
+        layout = QHBoxLayout(container)
+        
+        self.map_panel = MapPanel2D(self.map_engine, container)
         self.layer_panel = LayerPanel(self.icon_manager, self.chunk_engine, self.map_engine, container)
-        layout.addWidget(self.layer_panel, 1)
+        self.properties_panel = PropertiesPanel(self)
+        self.side_panel = SidePanel([self.layer_panel, self.properties_panel], self)
+        
+        splitter.addWidget(self.map_panel)
+        splitter.addWidget(self.side_panel)
+        
+        splitter.setSizes([800, 200])
+        
+        layout.addWidget(splitter)
 
     def undo(self):
         self.map_engine.history_manager.undo()

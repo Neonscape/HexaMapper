@@ -8,7 +8,7 @@ from modules.history_manager import HistoryManager
 from modules.tool_manager import ToolManager
 from modules.tools.draw_tool import DrawTool
 from OpenGL.GL import *
-from qtpy.QtCore import QPointF
+from qtpy.QtCore import QPointF, Signal, QObject  # 添加Signal导入
 import numpy as np
 from enum import Enum
 from modules.map_helpers import get_center_position_from_global_coord, global_coord_to_chunk_coord, global_pos_to_global_coord
@@ -32,7 +32,9 @@ class Camera2D:
     zoom: float = 0.1
     
 
-class MapEngine2D:
+class MapEngine2D(QObject):
+    transform_changed = Signal(float, float, float)  # pan_x, pan_y, zoom
+    
     """
     The core 2D map rendering engine responsible for managing map data,
     OpenGL drawing operations, camera control, and tool interactions.
@@ -41,6 +43,7 @@ class MapEngine2D:
         """
         Initializes the MapEngine2D.
         """
+        super().__init__()
         self.config = config
         self.chunk_engine = chunk_engine
         self.history_manager = history_manager
@@ -526,6 +529,7 @@ class MapEngine2D:
         self.camera.pos.setX(self.camera.pos.x() - delta_x * world_dx_per_pixel)
         self.camera.pos.setY(self.camera.pos.y() + delta_y * world_dy_per_pixel)
         self.map_panel.update()
+        self.transform_changed.emit(self.camera.pos.x(), self.camera.pos.y(), self.camera.zoom)
         
     def zoom(self, zooming_up: bool):
         """
@@ -545,3 +549,4 @@ class MapEngine2D:
             
         self.camera.zoom = max(min_zoom, min(self.camera.zoom, max_zoom))
         self.map_panel.update()
+        self.transform_changed.emit(self.camera.pos.x(), self.camera.pos.y(), self.camera.zoom)

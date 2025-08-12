@@ -1,6 +1,7 @@
 import sys
 from qtpy.QtWidgets import QApplication
 from modules.tools.dropper_tool import DropperTool
+from modules.tools.select_tool import SelectTool  # 添加选择工具
 from widgets.main_window import MainAppWindow
 from modules.map_engine import MapEngine2D
 from modules.icon_manager import IconManager
@@ -51,9 +52,11 @@ def run():
     draw_tool = DrawTool(map_engine)
     eraser_tool = EraserTool(map_engine)
     dropper_tool = DropperTool(map_engine)
+    select_tool = SelectTool(map_engine)
     tool_manager.register_tool("draw", draw_tool)
     tool_manager.register_tool("erase", eraser_tool)
     tool_manager.register_tool("dropper", dropper_tool)
+    tool_manager.register_tool("select", select_tool)  # 注册选择工具
     tool_manager.set_active_tool("draw") # Set a default tool
 
     # --- UI Initialization ---

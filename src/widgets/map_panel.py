@@ -1,7 +1,7 @@
 from qtpy.QtOpenGLWidgets import QOpenGLWidget
 from qtpy.QtGui import QSurfaceFormat
 from qtpy.QtCore import QPointF, Qt
-from qtpy.QtWidgets import QLabel
+from qtpy.QtWidgets import QLabel, QGraphicsView, QGraphicsScene  # 添加控件渲染层支持
 from OpenGL.GL import *
 import numpy as np
 from modules.map_engine import MapEngine2D
@@ -41,6 +41,18 @@ class MapPanel2D(QOpenGLWidget):
         
         self.fps_label: QLabel = QLabel(f"FPS: 0", self)
         self.fps_label.setGeometry(10, 10, 100, 30)
+        
+        # 创建控件渲染层
+        self.control_scene = QGraphicsScene(self)
+        self.control_view = QGraphicsView(self.control_scene, self)
+        self.control_view.setAttribute(Qt.WA_TransparentForMouseEvents)  # 穿透鼠标事件
+        self.control_view.setStyleSheet("background: transparent; border: none;")
+        self.control_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.control_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.control_view.setInteractive(False)
+        
+        # 连接地图引擎变换信号
+        engine.transform_changed.connect(self.update_control_view_transform)
 
     def _configure_opengl(self):
         """
@@ -80,6 +92,7 @@ class MapPanel2D(QOpenGLWidget):
         """
         glViewport(0, 0, w, h)
         self.engine.update_background(w, h)
+        self.control_view.resize(w, h)  # 同步调整控件视图大小
 
     def paintGL(self):
         """
@@ -102,6 +115,32 @@ class MapPanel2D(QOpenGLWidget):
             pos = self.event_handler.last_mouse_pos
             mouse_world_pos = self.engine.screen_to_world((pos.x(), pos.y()))
             self.engine.draw_tool_visual_aid(mouse_world_pos)
+        
+        # 控件层（QGraphicsView）会自动渲染，无需显式调用
+        # 删除对shader_manager.get_painter()的调用
+        
+    def update_control_view_transform(self, pan_x, pan_y, zoom):
+        """更新控件渲染层变换"""
+        transform = self.control_view.transform()
+        transform.reset()
+        transform.scale(zoom, zoom)
+        transform.translate(pan_x, pan_y)
+        self.control_view.setTransform(transform)
+        
+    def screen_to_control_scene(self, screen_pos):
+        """
+        将屏幕坐标转换为控件场景坐标
+        :param screen_pos: 屏幕坐标 (x, y)
+        :return: QPointF 控件场景坐标
+        """
+        # 1. 转换到OpenGL世界坐标
+        world_pos = self.engine.screen_to_world((screen_pos.x(), screen_pos.y()))
+        
+        # 2. 应用当前变换参数
+        scene_x = world_pos.x() * self.engine.camera.zoom + self.engine.camera.pos.x()
+        scene_y = world_pos.y() * self.engine.camera.zoom + self.engine.camera.pos.y()
+        
+        return QPointF(scene_x, scene_y)
 
     def export_to_image(self):
         self.makeCurrent()  # Ensure OpenGL context is current
@@ -287,4 +326,3 @@ class MapPanel2D(QOpenGLWidget):
             [0, 0, -2 / (far - near), -(far + near) / (far - near)],
             [0, 0, 0, 1]
         ], dtype=np.float32)
-        

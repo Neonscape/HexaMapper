@@ -130,6 +130,7 @@ class LayerPanel(QWidget):
         self.btns_layout.addWidget(self.down_btn)
         
         self.text_label = QLabel("Layers", self)
+        self.text_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         
         self.layout.addWidget(self.text_label)
         self.layout.addLayout(self.btns_layout)

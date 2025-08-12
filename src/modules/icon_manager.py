@@ -17,6 +17,7 @@ class IconManager:
             "minus": OutlineIcon.MINUS,
             "up": OutlineIcon.CARET_UP,
             "down": OutlineIcon.CARET_DOWN,
+            "select": OutlineIcon.CLICK
             # add more icons here
         }
         self._init_icons()
