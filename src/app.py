@@ -35,7 +35,7 @@ def run():
         sys.exit(1) # Exit if config fails to load
 
     # --- Manager Initialization ---
-    icon_manager = IconManager()
+    icon_manager = IconManager(app)
     shader_manager = ShaderManager()
     history_manager = HistoryManager()
     chunk_engine = ChunkEngine(config=config)

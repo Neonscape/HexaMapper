@@ -1,8 +1,12 @@
+from typing import Callable, Literal
 from OpenGL.GL import *
 from OpenGL.GL.shaders import compileShader, compileProgram
 import os
 from loguru import logger
 from .resource_path import get_resource_path
+from qtpy.QtWidgets import QApplication
+from qtpy.QtGui import QPalette, QColor
+from qtpy.QtCore import Qt
 
 def load_file(filepath: str) -> str:
     """
@@ -63,3 +67,19 @@ def load_program(vertex_file_path: str, fragment_file_path: str) -> int | None:
         return None
 
     return program
+
+def get_system_color_scheme(app: QApplication) -> Literal['DARK', 'LIGHT']:
+    """
+    Returns the system color scheme as a string, either 'DARK' or 'LIGHT'.
+
+    :return: The system color scheme.
+    :rtype: Literal['DARK', 'LIGHT']
+    """
+    palette = app.palette()
+    
+    # YIQ Color space formula
+    is_dark: Callable[[QColor], bool] = lambda c: (0.299 * c.red() + 0.587 * c.green() + 0.114 * c.blue()) < 128
+    
+    if is_dark(palette.window().color()) or is_dark(palette.base().color()): 
+        return 'DARK'
+    return 'LIGHT'
