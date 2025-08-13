@@ -8,17 +8,23 @@ from OpenGL.GL import *
 import numpy as np
 from modules.map_engine import MapEngine2D
 from modules.event_handlers import MapPanel2DEventHandler
-from modules.map_helpers import global_coord_to_chunk_coord, global_pos_to_global_coord, get_center_position_from_global_coord
+from modules.map_helpers import (
+    global_coord_to_chunk_coord,
+    global_pos_to_global_coord,
+    get_center_position_from_global_coord,
+)
 from qtpy.QtCore import QElapsedTimer, Signal
 from modules.config import IS_PROFILING
 
+
 class MapPanel2D(QOpenGLWidget):
     fps_update = Signal()
-    
+
     """
     A QOpenGLWidget subclass that serves as the main display panel for the 2D hex map.
     It handles OpenGL rendering, mouse interactions, and integrates with the MapEngine2D.
     """
+
     def __init__(self, engine: MapEngine2D, parent=None):
         """
         Initializes the MapPanel2D.
@@ -31,24 +37,24 @@ class MapPanel2D(QOpenGLWidget):
         super().__init__(parent)
         self.engine = engine
         self.last_mouse_pos = None
-        
+
         self._configure_opengl()
         self.setMouseTracking(True)
-        
+
         # The event handler is responsible for all user interaction with the map
         self.event_handler = MapPanel2DEventHandler(self.engine)
         self.installEventFilter(self.event_handler)
-        
+
         self.paint_count = 0
         self.paint_timer = QTimer(self)
         self.paint_timer.setInterval(1000)
         self.paint_timer.timeout.connect(self.update_fps_label)
         self.paint_timer.start()
-        
+
         self.fps_label: QLabel = QLabel(f"FPS: 0", self)
         self.fps_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.fps_label.setGeometry(10, 10, 100, 30)
-        
+
         # 创建控件渲染层
         self.control_scene = QGraphicsScene(self)
         self.control_view = QGraphicsView(self.control_scene, self)
@@ -57,10 +63,10 @@ class MapPanel2D(QOpenGLWidget):
         self.control_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.control_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.control_view.setInteractive(False)
-        
+
         # 连接地图引擎变换信号
         engine.transform_changed.connect(self.update_control_view_transform)
-        
+
         if IS_PROFILING:
             self.profiler = cProfile.Profile()
             self.profile_cnt = 0
@@ -71,9 +77,9 @@ class MapPanel2D(QOpenGLWidget):
         """
         format = QSurfaceFormat()
         format.setRenderableType(QSurfaceFormat.RenderableType.OpenGL)
-        format.setProfile(QSurfaceFormat.OpenGLContextProfile.CompatibilityProfile) 
-        format.setVersion(4, 1) 
-        format.setSamples(4) # Enable MSAA
+        format.setProfile(QSurfaceFormat.OpenGLContextProfile.CompatibilityProfile)
+        format.setVersion(4, 1)
+        format.setSamples(4)  # Enable MSAA
         self.setFormat(format)
 
     def initializeGL(self):
@@ -82,15 +88,16 @@ class MapPanel2D(QOpenGLWidget):
         This function is called once before the first call to paintGL() or resizeGL().
         """
         self.makeCurrent()
-        
+
         # Compile shaders now that we have a valid OpenGL context
         self.engine.shader_manager.compile_all_programs()
-        
+
         self.engine.init_engine()
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glEnable(GL_MULTISAMPLE) # Enable MSAA
+        glEnable(GL_MULTISAMPLE)  # Enable MSAA
+        glEnable(GL_LINE_SMOOTH)
 
     def resizeGL(self, w, h):
         """
@@ -109,40 +116,40 @@ class MapPanel2D(QOpenGLWidget):
         """
         Paints the OpenGL content. This function is called whenever the widget needs to be updated.
         """
-        
+
         if IS_PROFILING:
             if self.profile_cnt == 500:
-                stats = pstats.Stats(self.profiler).sort_stats('cumulative')
+                stats = pstats.Stats(self.profiler).sort_stats("cumulative")
                 stats.print_stats(20)
 
             if self.profile_cnt < 500:
                 self.profiler.enable(True, True)
-        
+
         self.paint_count += 1
-            
+
         bg_color = self.engine.config.hex_map_custom.default_cell_color.to_floats()
         glClearColor(*bg_color)
         glClear(GL_COLOR_BUFFER_BIT)
-        
+
         # self.engine.draw_gradient_background()
-        
+
         self.engine.update_and_render_chunks()
-        
+
         if self.event_handler.last_mouse_pos:
             pos = self.event_handler.last_mouse_pos
             mouse_world_pos = self.engine.screen_to_world((pos.x(), pos.y()))
             self.engine.draw_tool_visual_aid(mouse_world_pos)
-        
+
         if IS_PROFILING:
             if self.profile_cnt < 500:
                 self.profiler.disable()
                 print(self.profile_cnt)
                 self.profile_cnt += 1
-                
+
     def update_fps_label(self):
         self.fps_label.setText(f"FPS: {self.paint_count}")
         self.paint_count = 0
-        
+
     def update_control_view_transform(self, pan_x, pan_y, zoom):
         """更新控件渲染层变换"""
         transform = self.control_view.transform()
@@ -150,7 +157,7 @@ class MapPanel2D(QOpenGLWidget):
         transform.scale(zoom, zoom)
         transform.translate(pan_x, pan_y)
         self.control_view.setTransform(transform)
-        
+
     def screen_to_control_scene(self, screen_pos):
         """
         将屏幕坐标转换为控件场景坐标
@@ -159,11 +166,11 @@ class MapPanel2D(QOpenGLWidget):
         """
         # 1. 转换到OpenGL世界坐标
         world_pos = self.engine.screen_to_world((screen_pos.x(), screen_pos.y()))
-        
+
         # 2. 应用当前变换参数
         scene_x = world_pos.x() * self.engine.camera.zoom + self.engine.camera.pos.x()
         scene_y = world_pos.y() * self.engine.camera.zoom + self.engine.camera.pos.y()
-        
+
         return QPointF(scene_x, scene_y)
 
     def export_to_image(self):
@@ -171,18 +178,18 @@ class MapPanel2D(QOpenGLWidget):
         try:
             # Save original viewport
             original_viewport = glGetIntegerv(GL_VIEWPORT)
-            
+
             hex_radius = self.engine.config.hex_map_engine.hex_radius
             chunk_size = self.engine.config.hex_map_engine.chunk_size
-            
+
             # ----------------------------------------------------------------------
             # 1. Decide which cells have to appear in the image
             # ----------------------------------------------------------------------
-            hex_height = hex_radius * np.sqrt(3.0)          # distance between two rows
-            hex_width  = 2.0 * hex_radius                     # distance between two columns
-            
+            hex_height = hex_radius * np.sqrt(3.0)  # distance between two rows
+            hex_width = 2.0 * hex_radius  # distance between two columns
+
             cells = []
-            
+
             min_x_world = None
             max_x_world = None
             min_y_world = None
@@ -192,10 +199,10 @@ class MapPanel2D(QOpenGLWidget):
                 # No edits – export the current viewport
                 tl_world = self.engine.screen_to_world((0, 0))
                 br_world = self.engine.screen_to_world((self.width(), self.height()))
-                
+
                 min_x_world, min_y_world = tl_world.x(), tl_world.y()
                 max_x_world, max_y_world = br_world.x(), br_world.y()
-                
+
                 min_x_world, max_x_world = sorted((min_x_world, max_x_world))
                 min_y_world, max_y_world = sorted((min_y_world, max_y_world))
 
@@ -206,20 +213,26 @@ class MapPanel2D(QOpenGLWidget):
                 min_gx, max_gx = sorted((min_gx, max_gx))
                 min_gy, max_gy = sorted((min_gy, max_gy))
 
-                _cells = [(x, y)
-                         for x in range(min_gx - 1, max_gx + 2)
-                         for y in range(min_gy - 1, max_gy + 2)]
-                
+                _cells = [
+                    (x, y)
+                    for x in range(min_gx - 1, max_gx + 2)
+                    for y in range(min_gy - 1, max_gy + 2)
+                ]
+
                 for cell in _cells:
                     pos = get_center_position_from_global_coord(cell, hex_radius)
-                    if (min_x_world <= pos[0] <= max_x_world and
-                            min_y_world <= pos[1] <= max_y_world):
+                    if (
+                        min_x_world <= pos[0] <= max_x_world
+                        and min_y_world <= pos[1] <= max_y_world
+                    ):
                         cells.append(cell)
-                
+
             else:
                 # 1. Build the axis–aligned rectangle that contains every modified cell
-                gpos = [get_center_position_from_global_coord(c, hex_radius)
-                        for c in self.engine.chunk_engine.get_modified_cells_in_active_layer()]
+                gpos = [
+                    get_center_position_from_global_coord(c, hex_radius)
+                    for c in self.engine.chunk_engine.get_modified_cells_in_active_layer()
+                ]
                 min_x_world = min(c[0] for c in gpos)
                 max_x_world = max(c[0] for c in gpos)
                 min_y_world = min(c[1] for c in gpos)
@@ -232,7 +245,9 @@ class MapPanel2D(QOpenGLWidget):
                     QPointF(max_x_world, min_y_world),
                     QPointF(max_x_world, max_y_world),
                 ]
-                hex_coords = [global_pos_to_global_coord(p, hex_radius) for p in corners]
+                hex_coords = [
+                    global_pos_to_global_coord(p, hex_radius) for p in corners
+                ]
 
                 # 3. Bounding rhombus in hex space (offset coordinates here)
                 min_hx = min(h[0] for h in hex_coords) - 1
@@ -241,87 +256,108 @@ class MapPanel2D(QOpenGLWidget):
                 max_hy = max(h[1] for h in hex_coords) + 1
 
                 # 4. Every hex cell inside that rhombus
-                _cells = [(x, y)
-                         for x in range(min_hx, max_hx + 1)
-                         for y in range(min_hy, max_hy + 1)]
-                
+                _cells = [
+                    (x, y)
+                    for x in range(min_hx, max_hx + 1)
+                    for y in range(min_hy, max_hy + 1)
+                ]
+
                 for cell in _cells:
                     pos = get_center_position_from_global_coord(cell, hex_radius)
-                    if (min_x_world <= pos[0] <= max_x_world and
-                            min_y_world <= pos[1] <= max_y_world):
+                    if (
+                        min_x_world <= pos[0] <= max_x_world
+                        and min_y_world <= pos[1] <= max_y_world
+                    ):
                         cells.append(cell)
 
             # ----------------------------------------------------------------------
             # 3. Determine final image size
             # ----------------------------------------------------------------------
-            world_width  = max_x_world - min_x_world
+            world_width = max_x_world - min_x_world
             world_height = max_y_world - min_y_world
 
             scale_factor = min(1.0, 100.0 / max(world_width, world_height))
 
             max_cell_size = 40
             min_cell_size = 15
-            pixel_per_hex = max(min_cell_size,
-                                min(max_cell_size, int(max_cell_size * scale_factor)))
+            pixel_per_hex = max(
+                min_cell_size, min(max_cell_size, int(max_cell_size * scale_factor))
+            )
 
             pixels_per_world_unit = pixel_per_hex / hex_width
-            width  = max(1, int(world_width  * pixels_per_world_unit))
+            width = max(1, int(world_width * pixels_per_world_unit))
             height = max(1, int(world_height * pixels_per_world_unit))
-            
+
             fbo = glGenFramebuffers(1)
             texture = glGenTextures(1)
-            
+
             try:
                 glBindFramebuffer(GL_FRAMEBUFFER, fbo)
                 glBindTexture(GL_TEXTURE_2D, texture)
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, None)
+                glTexImage2D(
+                    GL_TEXTURE_2D,
+                    0,
+                    GL_RGBA,
+                    width,
+                    height,
+                    0,
+                    GL_RGBA,
+                    GL_UNSIGNED_BYTE,
+                    None,
+                )
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0)
+                glFramebufferTexture2D(
+                    GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0
+                )
 
                 if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
                     raise RuntimeError("Framebuffer is not complete!")
 
                 glViewport(0, 0, width, height)
-                
+
                 # Clear to transparent instead of using gradient background
                 glClearColor(0, 0, 0, 0)
                 glClear(GL_COLOR_BUFFER_BIT)
 
                 # Create projection matrix for the export region
                 proj_mat = self._create_ortho_matrix(
-                    min_x_world, max_x_world, 
-                    min_y_world, max_y_world, 
-                    -1, 1
+                    min_x_world, max_x_world, min_y_world, max_y_world, -1, 1
                 )
-            
+
                 view_mat = np.identity(4, dtype=np.float32)
-                
+
                 chunks_to_render = set()
-                chunk_x_min = float('inf')
-                chunk_x_max = -float('inf')
-                chunk_y_min = float('inf')
-                chunk_y_max = -float('inf')
+                chunk_x_min = float("inf")
+                chunk_x_max = -float("inf")
+                chunk_y_min = float("inf")
+                chunk_y_max = -float("inf")
                 for x, y in cells:
                     chunk_x, chunk_y, _, _ = global_coord_to_chunk_coord(
                         (x, y), self.engine.config.hex_map_engine.chunk_size
                     )
-                    if chunk_x < chunk_x_min: chunk_x_min = chunk_x
-                    if chunk_x > chunk_x_max: chunk_x_max = chunk_x
-                    if chunk_y < chunk_y_min: chunk_y_min = chunk_y
-                    if chunk_y > chunk_y_max: chunk_y_max = chunk_y
-                    
+                    if chunk_x < chunk_x_min:
+                        chunk_x_min = chunk_x
+                    if chunk_x > chunk_x_max:
+                        chunk_x_max = chunk_x
+                    if chunk_y < chunk_y_min:
+                        chunk_y_min = chunk_y
+                    if chunk_y > chunk_y_max:
+                        chunk_y_max = chunk_y
+
                 chunk_x_min = int(chunk_x_min)
                 chunk_x_max = int(chunk_x_max)
                 chunk_y_min = int(chunk_y_min)
                 chunk_y_max = int(chunk_y_max)
-                
+
                 for chunk_x in range(chunk_x_min, chunk_x_max + 1):
                     for chunk_y in range(chunk_y_min, chunk_y_max + 1):
                         chunks_to_render.add((chunk_x, chunk_y))
                         if (chunk_x, chunk_y) not in self.engine.chunk_buffers:
-                            self.engine._update_chunk_instance_buffer((chunk_x, chunk_y))
-                
+                            self.engine._update_chunk_instance_buffer(
+                                (chunk_x, chunk_y)
+                            )
+
                 # Apply the view matrix to center on export region
                 self.engine.render_scene(proj_mat, view_mat, chunks_to_render)
 
@@ -331,22 +367,26 @@ class MapPanel2D(QOpenGLWidget):
                 glBindFramebuffer(GL_FRAMEBUFFER, 0)
                 glDeleteFramebuffers(1, [fbo])
                 glDeleteTextures(1, [texture])
-            
+
             # Restore original viewport
             glViewport(*original_viewport)
-            
+
             return pixels, width, height
         except Exception as e:
             import traceback
+
             traceback.print_exc()
             raise RuntimeError(f"Export failed: {str(e)}")
         finally:
             self.doneCurrent()  # Release OpenGL context
 
     def _create_ortho_matrix(self, left, right, bottom, top, near, far):
-        return np.array([
-            [2 / (right - left), 0, 0, -(right + left) / (right - left)],
-            [0, 2 / (top - bottom), 0, -(top + bottom) / (top - bottom)],
-            [0, 0, -2 / (far - near), -(far + near) / (far - near)],
-            [0, 0, 0, 1]
-        ], dtype=np.float32)
+        return np.array(
+            [
+                [2 / (right - left), 0, 0, -(right + left) / (right - left)],
+                [0, 2 / (top - bottom), 0, -(top + bottom) / (top - bottom)],
+                [0, 0, -2 / (far - near), -(far + near) / (far - near)],
+                [0, 0, 0, 1],
+            ],
+            dtype=np.float32,
+        )
